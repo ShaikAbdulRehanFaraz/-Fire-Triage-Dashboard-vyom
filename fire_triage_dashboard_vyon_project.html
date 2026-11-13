@@ -1,0 +1,1614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fire Triage Dashboard — Satellite Heat Spot Review</title>
+
+<!-- Leaflet CSS & JS for real Satellite Image Map, Thermal Map, Coordinates Grid Map & World Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+:root{
+  color-scheme:light;--bg:#f6f1ea;--panel:#fffdfa;--ink:#2a1f1a;--muted:#7a6a5f;
+  --line:#e6d9cb;--brand:#9a3412;--brand-soft:#fbe9dc;--red:#c0392b;
+  --red-bg:#fbe9e7;--orange:#8a5200;--orange-bg:#fdf0dc;--yellow:#6b5500;
+  --yellow-bg:#fbf3cf;--green:#176b50;--green-bg:#e3f7ee;--shadow:0 1px 2px rgba(0,0,0,.05)
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;transition:background-color .24s ease,color .24s ease}
+button,input,select{font:inherit}
+button{border:0;border-radius:10px;padding:10px 14px;background:var(--brand);color:white;font-weight:700;cursor:pointer;transition:transform .18s ease,filter .18s ease,background-color .18s ease}
+button:hover{filter:brightness(.96);transform:translateY(-1px)}
+button:active{transform:translateY(1px)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #c2410c;outline-offset:2px}
+button.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}
+button.secondary:hover{background:#fdf9f4;border-color:var(--brand)}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+header{background:linear-gradient(90deg,#fff4e8,#fffdfa);color:var(--ink);border-bottom:1px solid var(--line);padding:22px clamp(16px,3vw,36px)}
+.headrow{max-width:1500px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{font-size:clamp(24px,3vw,34px);line-height:1.15;margin:0 0 7px}
+header p{margin:0;color:var(--muted)}
+.status{font-size:12px;background:var(--brand-soft);border:1px solid var(--line);border-radius:99px;padding:6px 10px;transition:all .2s ease}
+main{max-width:1500px;margin:auto;padding:20px clamp(12px,2vw,28px) 36px}
+.notice{padding:12px 14px;border:1px solid var(--line);border-left:4px solid #e8912d;background:#fff;border-radius:12px;margin-bottom:16px;color:var(--ink);transition:all .24s ease}
+.notice strong{display:block}
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr);gap:18px;align-items:start}
+.sidebar,.card,.metric{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.sidebar{padding:17px;position:sticky;top:12px}
+.card{padding:17px;min-width:0}
+.card:hover{box-shadow:0 6px 20px rgba(83,43,19,.07)}
+.card h2,.sidebar h2{font-size:17px;margin:0 0 12px}
+.section{margin-bottom:18px}
+.section:last-child{margin-bottom:0}
+label{display:block;font-weight:650;font-size:13px;margin:12px 0 5px}
+input[type=range]{width:100%;accent-color:var(--brand);transition:opacity .15s ease}
+input[type=file]{width:100%;font-size:12px}
+select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px;background:#fff;color:var(--ink);transition:border-color .18s ease}
+.help{font-size:12px;color:var(--muted);margin:5px 0 0}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.actions button{flex:1}
+.content{display:grid;gap:16px;min-width:0}
+.metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.metric{padding:13px 14px;border-top:4px solid #dfe7f1;cursor:pointer}
+.metric:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(83,43,19,.08)}
+.metric strong{display:block;font-size:24px;line-height:1.25;overflow-wrap:anywhere}
+.metric span{font-size:12px;color:var(--muted)}
+.metric.red{border-top-color:#d9534f}.metric.orange{border-top-color:#e8912d}.metric.yellow{border-top-color:#e0b83a}.metric.blue{border-top-color:#c2410c}.metric.green{border-top-color:#176b50}
+.metric button{display:block;background:transparent;color:inherit;padding:0;text-align:left;width:100%;border:none;cursor:pointer}
+.two{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(270px,1fr);gap:16px;align-items:start}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.mapwrap{background:#efe6da;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative;min-height:400px}
+#leafletMap{width:100%;height:400px;background:#efe6da}
+#map{width:100%;height:400px;display:none}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-top:10px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.detailbox{border-radius:12px;background:#f6efe6;padding:13px;min-height:150px;transition:background-color .22s ease}
+.map-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fffaf5}.map-meta .meta-label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}.map-meta strong{font-size:13px;overflow-wrap:anywhere}.map-meta .meta-empty{grid-column:1/-1;color:var(--muted);font-size:12px}@media(max-width:560px){.map-meta{grid-template-columns:1fr}}
+.map-insights{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,#fffaf5,#f6eadb)}
+.map-insights h3{font-size:14px;margin:0 0 10px}.insight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.insight-tile{background:rgba(255,255,255,.76);border:1px solid #ead9c7;border-radius:9px;padding:10px;min-width:0}.insight-tile span{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}.insight-tile strong{font-size:15px;overflow-wrap:anywhere}.insight-note{font-size:12px;color:var(--muted);margin:9px 0 0;line-height:1.45}@media(max-width:560px){.insight-grid{grid-template-columns:1fr 1fr}}
+.extra-insights{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:12px;background:#fffaf5}.extra-insights h3{font-size:14px;margin:0 0 10px}.extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.extra-stat{padding:10px;border-radius:9px;background:#f6efe6;border:1px solid #ead9c7;min-width:0}.extra-stat span{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}.extra-stat strong{font-size:15px;overflow-wrap:anywhere}.priority-bars{display:grid;gap:8px;margin-top:12px}.priority-row{display:grid;grid-template-columns:95px 1fr 32px;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.priority-track{height:8px;background:#eee3d7;border-radius:99px;overflow:hidden}.priority-fill{height:100%;border-radius:99px;transition:width .4s ease}.temp-note{font-size:11px;line-height:1.45;color:var(--muted);margin:10px 0 0}
+
+.friendly-help{margin-top:12px;border:1px solid #ead7c4;border-radius:13px;padding:14px;background:linear-gradient(135deg,#fffaf4,#f5e8d9);color:var(--ink)}
+.friendly-help-head{display:flex;gap:10px;align-items:center;margin-bottom:12px}.friendly-help-icon{display:grid;place-items:center;flex:0 0 38px;height:38px;border-radius:11px;background:#f2d5bd;font-size:21px}.friendly-help h3{margin:0 0 3px;font-size:16px}.friendly-help-head p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}
+.friendly-help-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.friendly-help-grid article{display:flex;gap:9px;align-items:flex-start;padding:10px;border:1px solid #ead9c8;border-radius:10px;background:rgba(255,255,255,.72);min-width:0}.friendly-step{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:8px;background:#a83e13;color:white;font-size:11px;font-weight:800}.friendly-help-grid strong{display:block;font-size:12px;margin:1px 0 4px}.friendly-help-grid p{font-size:11px;line-height:1.5;color:var(--muted);margin:0}.friendly-glossary{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;align-items:center}.friendly-glossary>strong{font-size:11px;margin-right:2px}.friendly-glossary span{font-size:10px;line-height:1.4;background:#fff;border:1px solid #ead9c8;border-radius:99px;padding:5px 8px;color:var(--muted)}
+@media(max-width:760px){.friendly-help-grid{grid-template-columns:1fr}.friendly-glossary span{border-radius:8px}}
+.visual-guide{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,#fffdfa,#f7ebdd)}.visual-guide h3{font-size:14px;margin:0 0 10px}.visual-guide-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.visual-guide-item{min-width:0;border:1px solid #ead9c7;border-radius:10px;background:rgba(255,255,255,.8);padding:9px}.visual-guide-item svg{display:block;width:100%;height:auto;margin-bottom:8px}.visual-guide-item strong{display:block;font-size:12px;line-height:1.35}.visual-guide-item p{font-size:11px;color:var(--muted);line-height:1.45;margin:5px 0 0}@media(max-width:760px){.visual-guide-grid{grid-template-columns:1fr}.visual-guide-item{display:grid;grid-template-columns:minmax(100px,34%) 1fr;column-gap:10px;align-items:center}.visual-guide-item svg{grid-row:span 2;margin:0}.visual-guide-item strong{align-self:end}}
+.score{font-size:29px;font-weight:800;line-height:1.2}
+.pill{display:inline-block;border-radius:99px;padding:4px 9px;font-size:12px;font-weight:750;transition:all .18s ease}
+.pill.red{background:var(--red-bg);color:var(--red)}.pill.orange{background:var(--orange-bg);color:var(--orange)}.pill.yellow{background:var(--yellow-bg);color:var(--yellow)}.pill.green{background:var(--green-bg);color:var(--green)}
+.factor{margin-top:13px}.factorhead{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.track{height:7px;background:#e6d9cb;border-radius:99px;margin:5px 0;overflow:hidden}.fill{height:100%;background:var(--brand);border-radius:99px;transition:width .4s ease}
+.tablewrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;background:#f6efe6;color:var(--muted);z-index:1}
+tbody tr{cursor:pointer;transition:background-color .16s ease}tbody tr:hover{background:#f8efe4}tbody tr.selected{background:#f3e1cf}
+.small{font-size:12px;color:var(--muted)}
+.empty{padding:30px 14px;text-align:center;color:var(--muted)}
+.timeline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.timeline input{flex:1;min-width:150px}
+footer{color:var(--muted);font-size:12px;margin-top:18px}
+.error{display:none;margin-top:9px;background:#fff0f0;border:1px solid #ffc9c9;border-radius:9px;padding:9px;color:#9b1c1c;font-size:12px}
+.success{color:var(--green);font-size:12px}
+.mini svg{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px;margin-top:12px}#scanOut a{color:var(--brand);font-weight:700}
+.presets{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;transition:all .2s ease}
+.presets button{padding:7px 12px;border-radius:99px}
+.presets button.secondary.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.summary{font-size:16px;background:var(--brand-soft)}.summary a{color:var(--brand);font-weight:700}
+.loc{display:block;border-radius:6px;border:1px solid var(--line)}
+.bell{position:relative;padding:6px 12px;border-radius:99px}.bell b{background:#d9534f;color:#fff;border-radius:99px;padding:0 7px;font-size:12px;margin-left:6px}.bell.alert{animation:bp 1.4s infinite}
+@keyframes bp{50%{box-shadow:0 0 0 7px rgba(217,83,79,.25)}}
+.alertlist{display:grid;gap:8px;margin-top:10px}.al{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);border-left:5px solid #d9534f;border-radius:10px;padding:9px 12px;background:#fff;transition:transform .2s ease,box-shadow .2s ease}
+.al.el{border-left-color:#e8912d}
+.al.safe{border-left-color:#176b50}
+#toasts{position:fixed;right:14px;bottom:14px;display:grid;gap:8px;z-index:9999;width:min(350px,calc(100vw - 28px))}
+.toast{background:var(--panel);border:1px solid var(--line);border-left:5px solid #d9534f;border-radius:12px;padding:11px 13px;box-shadow:0 6px 18px rgba(0,0,0,.18);animation:ti .25s ease}
+@keyframes ti{from{transform:translateY(12px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.bell.alert,.toast{animation:none}}
+
+/* 5m Fire Radius Pulse & Marker Animation */
+@keyframes pulseAlert5m {
+  0% { transform: scale(1); opacity: 0.95; }
+  50% { transform: scale(1.65); opacity: 0.25; }
+  100% { transform: scale(1); opacity: 0.95; }
+}
+.pulse-beacon-5m {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(217, 83, 79, 0.45);
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  animation: pulseAlert5m 1.8s infinite ease-in-out;
+  pointer-events: none;
+}
+.hud-coords-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  z-index: 800;
+  background: rgba(255, 253, 250, 0.94);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* Thermal Heatmap Gradient Ramp Bar */
+.thermal-ramp-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdfa;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.thermal-ramp-gradient {
+  flex: 1;
+  height: 9px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #1e1b4b 0%, #4338ca 25%, #d97706 50%, #dc2626 75%, #ffffff 100%);
+  border: 1px solid #d1d5db;
+}
+
+.tip{display:inline-block;position:relative;width:16px;height:16px;border-radius:50%;background:var(--brand-soft);color:var(--brand);font:700 11px/16px system-ui;text-align:center;cursor:help;margin-left:6px;vertical-align:middle}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:-10px;top:22px;width:230px;background:#2a1f1a;color:#fff;padding:8px 10px;border-radius:8px;font-weight:400;font-size:12px;line-height:1.4;text-align:left;z-index:30;white-space:normal}
+.nohints .tip{display:none}
+
+@media(max-width:1100px){.layout{grid-template-columns:1fr}.sidebar{position:static}.two{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.two.even{grid-template-columns:1fr}.sidebar{max-height:none}}
+@media(max-width:600px){main{padding:12px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.card,.sidebar{padding:13px}.metric strong{font-size:22px}header{padding:18px 14px}}
+.satframe{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#1b1b1b;aspect-ratio:520/340}
+.satframe img{width:100%;height:100%;object-fit:cover;display:block}
+.satcross{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 2px rgba(217,83,79,.9);pointer-events:none}
+.satmsg{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:12px;text-align:center;padding:12px;background:rgba(0,0,0,.4)}
+.satmsg[hidden]{display:none}
+.satbox a{color:var(--brand);font-weight:700}
+.brief{margin-top:16px}.brief h3{font-size:15px;margin:0 0 8px}#briefChart{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px;background:#fffaf5}
+.satframe img{opacity:0;transition:opacity .35s ease}.satframe img.loaded{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="headrow">
+    <div><h1>🔥 Fire Triage Dashboard</h1><p>Review satellite heat detections, understand the ranking, and decide what to verify first.</p></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="status" id="apiKeyHeaderBadge" style="cursor:pointer;font-weight:600" title="Click to view API Key">🔑 Key: <code id="headerKeySnippet">fire_sec...</code> <b id="headerKeyDot" style="color:#c0392b">●</b></span>
+      <label class="status" style="margin:0;font-weight:600;cursor:pointer"><input type="checkbox" id="hintsOn" checked> 💡 Hints</label>
+      <button class="secondary bell" id="bell" title="Jump to regional fire alerts">🔔 Alerts<b id="bellCount">0</b></button>
+      <span class="status" id="dataBadge">Loading data...</span>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="notice"><strong>Heat detections are not confirmed fires.</strong>
+    Use this to decide what to verify first. It is not an emergency alert or a spread prediction; confirm with local responders.
+  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="section">
+        <h2>1. Add data</h2>
+        
+        <!-- API Key Input Section -->
+        <label for="apiKeyInput">API Key (Backend / NASA FIRMS)<span class="tip" tabindex="0" data-tip="Enter your secret Backend API Key or NASA FIRMS MAP_KEY to fetch authenticated fire data.">?</span></label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="password" id="apiKeyInput" value="fire_sec_key_2026_dev" placeholder="Enter API Key here..." style="font-family:monospace;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;width:100%">
+          <button class="secondary" id="btnToggleApiKeyEye" type="button" style="padding:7px 10px;font-size:13px" title="Show/Hide API Key">👁️</button>
+        </div>
+        <label for="apiSource">Data source</label>
+        <select id="apiSource"><option value="auto">Auto-detect from key</option><option value="firms">NASA FIRMS (live, direct)</option><option value="backend">My backend server</option></select>
+        <div id="firmsOpts">
+          <label for="firmsArea">FIRMS area</label>
+          <select id="firmsArea"><option value="68,6,98,36">India</option><option value="92,-11,141,28">Southeast Asia</option><option value="112,-45,155,-10">Australia</option><option value="-125,31,-102,49">Western USA</option><option value="-18,-35,52,37">Africa</option><option value="-10,35,40,70">Europe</option><option value="world">World (top 3000 by heat)</option></select>
+          <label for="firmsDays">Days back</label>
+          <select id="firmsDays"><option>1</option><option selected>2</option><option>3</option><option>5</option></select>
+        </div>
+        <div id="backendOpts">
+          <label for="backendUrl">Backend URL</label>
+          <input id="backendUrl" type="text" value="http://localhost:3000" style="font-family:monospace;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;width:100%">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button id="btnConnectApi" style="flex:1;background:#176b50;font-size:12px;padding:8px 10px" title="Connect and fetch with API Key">⚡ Connect API</button>
+          <button class="secondary" id="loadSample" style="flex:1;font-size:12px;padding:8px 10px">Load demo data</button>
+        </div>
+        <div id="apiKeyStatusText" class="help" style="margin-top:4px">
+          🔑 Active Key: <code id="activeKeyDisplay">fire_sec_key_2026_dev</code> <span id="apiStatusBadge" style="color:#176b50;font-weight:700">● Valid</span>
+        </div>
+
+        <p class="help">NASA FIRMS keys are 32 characters (free at firms.modaps.eosdis.nasa.gov/api/map_key). Demo data includes spots with fire radius &lt; 5m (no alert) and ≥ 5m (critical alert).</p>
+        <label for="csvFile">Or upload a FIRMS-style CSV</label>
+        <input id="csvFile" type="file" accept=".csv,text/csv">
+        <p class="help">Required: latitude, longitude, acq_date, acq_time. Optional: frp, confidence, fire_radius_m.</p>
+        <div id="fileMessage" class="help" role="status"></div><div id="error" class="error" role="alert"></div>
+      </div>
+      <div class="section" id="filters">
+        <h2>2. Narrow it down</h2>
+        
+        <!-- 5-Meter Fire Radius Alert Filter -->
+        <label for="radiusFilter">5m Fire radius alert filter<span class="tip" tabindex="0" data-tip="Fire radius 5m rule: if radius < 5m triggers NO ALERT. If radius >= 5m triggers an ALERT.">?</span></label>
+        <select id="radiusFilter">
+          <option value="all">All detections (&lt; 5m &amp; ≥ 5m)</option>
+          <option value="alert">🚨 Alerts only (fire radius ≥ 5m)</option>
+          <option value="safe">🟢 No alert only (fire radius &lt; 5m)</option>
+        </select>
+
+        <label for="hours">Age window <strong id="hoursLabel">168 hours</strong><span class="tip" tabindex="0" data-tip="Only show heat spots seen within this many hours of the newest one.">?</span></label>
+        <input id="hours" type="range" min="6" max="168" step="6" value="168">
+        <p class="help">Only spots from this many hours back.</p>
+        <label for="confidence">Minimum confidence <strong id="confidenceLabel">0%</strong><span class="tip" tabindex="0" data-tip="How sure the satellite is that it is real heat. Raise it to hide doubtful spots.">?</span></label>
+        <input id="confidence" type="range" min="0" max="100" step="5" value="0">
+        <label for="priority">Priority filter<span class="tip" tabindex="0" data-tip="Red = check now, orange = check soon, yellow = keep watching.">?</span></label>
+        <select id="priority"><option value="all">All priorities</option><option value="Check now">Check now</option><option value="Check soon">Check soon</option><option value="Keep watching">Keep watching</option></select>
+        <label for="country">Country<span class="tip" tabindex="0" data-tip="Guessed from the nearest city, so spots near borders can be off.">?</span></label><select id="country"><option value="all">All countries</option></select>
+        <label style="font-weight:500"><input type="checkbox" id="pinOnly"> Show only my pinned spots (<span id="pinCount">0</span>)</label>
+        <label style="font-weight:500"><input type="checkbox" id="hideOneOff"> Hide one-off spots (not seen again over <select id="minSeen" style="width:auto;display:inline;padding:3px"><option value="6">6 h</option><option value="12">12 h</option><option value="24">24 h</option></select>)</label>
+        <div class="actions" style="margin-top:12px"><button class="secondary" id="reset">Reset filters</button></div>
+      </div>
+      <details class="section"><summary style="cursor:pointer;font-weight:700;font-size:17px">3. Fine-tune ranking (optional)</summary>
+        <p class="help">Choose what counts most. The quick buttons above the tiles do this for you.</p>
+        <label for="wRecency">Recency <strong id="wRecencyLabel">30%</strong><span class="tip" tabindex="0" data-tip="Newer detections score higher.">?</span></label><input id="wRecency" type="range" min="0" max="100" value="30">
+        <label for="wConfidence">Confidence <strong id="wConfidenceLabel">25%</strong><span class="tip" tabindex="0" data-tip="Spots the satellite is more sure about score higher.">?</span></label><input id="wConfidence" type="range" min="0" max="100" value="25">
+        <label for="wHeat">Heat (FRP) <strong id="wHeatLabel">25%</strong><span class="tip" tabindex="0" data-tip="Hotter spots score higher. FRP is the heat power in megawatts.">?</span></label><input id="wHeat" type="range" min="0" max="100" value="25">
+        <label for="wRepeats">Nearby detections <strong id="wRepeatsLabel">20%</strong><span class="tip" tabindex="0" data-tip="Spots with many others close by in time and place score higher (may be a spreading fire).">?</span></label><input id="wRepeats" type="range" min="0" max="100" value="20">
+        <label for="tNow">“Check now” starts at score <strong id="tNowLabel">70</strong><span class="tip" tabindex="0" data-tip="Spots at or above this score are marked red: look at them first.">?</span></label><input id="tNow" type="range" min="30" max="95" value="70">
+        <label for="tSoon">“Check soon” starts at score <strong id="tSoonLabel">45</strong><span class="tip" tabindex="0" data-tip="Spots from this score up to the red level are marked orange.">?</span></label><input id="tSoon" type="range" min="10" max="90" value="45">
+      </details>
+    </aside>
+    <section class="content">
+      <section class="card" id="welcome" style="display:none;text-align:center;padding:32px 16px"><h2 style="font-size:23px">👋 Welcome! Three easy steps</h2>
+        <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin:12px 0 18px;font-size:15px"><span>1️⃣ Add data</span><span>2️⃣ See what to check first</span><span>3️⃣ Tap a spot to learn why</span></div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button id="wDemo" style="padding:14px 26px;font-size:17px">▶ Try demo data</button><button class="secondary" id="wUpload" style="padding:14px 26px;font-size:17px">Upload my CSV</button></div>
+        <p class="help" style="margin-top:12px">Demo data is practice data. Detections with fire radius &ge; 5m trigger alerts; less than 5m do not.</p></section>
+      <div class="card summary" id="summary"></div>
+      <section class="card" id="alertCard"><div class="cardhead"><h2>🚨 Regional fire &amp; 5m perimeter alerts<span class="tip" tabindex="0" data-tip="Flags high-fire activity and detections where estimated fire radius exceeds the 5-meter safety limit.">?</span></h2>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><label class="small" style="margin:0">Sensitivity <select id="sens" style="width:auto;padding:4px"><option value="0">Low</option><option value="1" selected>Medium</option><option value="2">High</option></select></label>
+        <label class="small" style="margin:0;font-weight:500"><input type="checkbox" id="notifyOn"> Browser notifications<span class="tip" tabindex="0" data-tip="Pops up when a new fire radius alert or high-fire region appears.">?</span></label></div></div>
+        <div id="alertList" class="alertlist"></div><p class="help" id="alertMsg">Alert rule: fire radius &ge; 5 meters triggers an alert; radius &lt; 5 meters triggers no alert (monitored/confined). Pop-up alerts appear at the bottom right.</p></section>
+      
+      <div class="presets"><span class="small">Rank by:</span><button class="secondary" data-pre="bal">⚖ Balanced</button><button class="secondary" data-pre="new">🕒 Newest first</button><button class="secondary" data-pre="big">🔥 Biggest heat</button><button class="secondary" data-pre="rep">🔁 Seen again &amp; again</button><span class="small">· Tip: tap a colored tile to filter</span></div>
+      
+      <!-- Metrics Bar with 5m Radius Alert Counter -->
+      <div class="metrics">
+        <div class="metric blue"><strong id="shownCount">0</strong><span>Spots shown</span></div>
+        <div class="metric red"><button id="filterAlert5m"><strong id="alert5mCount">0</strong><span>🚨 Radius ≥ 5m alert</span></button></div>
+        <div class="metric green"><button id="filterSafe5m"><strong id="safe5mCount">0</strong><span>🟢 Radius &lt; 5m (no alert)</span></button></div>
+        <div class="metric red"><button id="filterNow"><strong id="nowCount">0</strong><span>🔴 Check now</span></button></div>
+        <div class="metric orange"><button id="filterSoon"><strong id="soonCount">0</strong><span>🟠 Check soon</span></button></div>
+        <div class="metric"><strong id="maxRadius">—</strong><span>Max fire radius (m)</span></div>
+      </div>
+      
+      <div class="two">
+        <section class="card">
+          <div class="cardhead">
+            <h2>Detection map<span class="tip" tabindex="0" data-tip="Select World Map, Thermal Map, Coordinates Grid Map, Lat/Lon Map, or Satellite Image Map.">?</span></h2>
+            <span class="small" id="mapCount">Loading map...</span>
+          </div>
+
+          <!-- The Map View Mode Switchers: World Map, Thermal Map, Coordinates Grid Map, Lat/Lon, Satellite -->
+          <div class="presets" style="margin-bottom:8px">
+            <span class="small">Map view:</span>
+            <button class="secondary" id="mapModePlot" data-mode="plot">📊 Detection Plot Map</button>
+            <button class="secondary" id="mapModeCoord" data-mode="coord">🌐 Lat/Lon Map</button>
+            <button class="secondary" id="mapModeGrid" data-mode="grid">📐 Coordinates Grid Map</button>
+            <button class="secondary" id="mapModeThermal" data-mode="thermal">🌡️ Thermal Map</button>
+            <button class="secondary" id="mapModeSat" data-mode="sat">🛰️ Satellite Image Map</button>
+            <button class="secondary" id="mapModeWorld" data-mode="world">🌍 World Map</button>
+          </div>
+
+          <div class="mapwrap">
+            <div id="leafletMap"></div>
+            <svg id="map" viewBox="0 0 600 400" role="img" aria-label="Map-like plot of latitude and longitude detection points"></svg>
+            <div class="hud-coords-bar" id="hudCoordsBar">
+              📍 Lat: <span id="hudLat">—</span> | Lon: <span id="hudLon">—</span> | Zoom: <span id="hudZoom">—</span> | Mode: <span id="hudMode">Coordinates</span>
+            </div>
+          </div>
+
+          <!-- Thermal Heat Intensity Scale Indicator (Visible when Thermal Map is active) -->
+          <div class="thermal-ramp-bar" id="thermalRampBar" style="display:none;">
+            <span>🌡️ Thermal Infrared Heat (FRP):</span>
+            <span style="font-size:10.5px;">Ambient / Low</span>
+            <div class="thermal-ramp-gradient"></div>
+            <span style="font-size:10.5px;color:#c0392b;font-weight:700;">Critical Radiation (≥5m)</span>
+          </div>
+
+          <div class="legend">
+            <span><i class="dot" style="background:#d9534f"></i>🚨 Fire radius ≥ 5m (ALERT)</span>
+            <span><i class="dot" style="background:#176b50"></i>🟢 Fire radius &lt; 5m (NO ALERT)</span>
+            <span><i class="dot" style="background:#e8912d"></i>Check soon</span>
+            <span><i class="dot" style="background:#e0b83a"></i>Keep watching</span>
+          </div>
+          <div class="map-meta" id="mapMeta"><div class="meta-empty">Select a detection to show its coordinates, 5m fire radius, and observation timestamp here.</div></div>
+          <div class="map-insights" id="mapInsights" aria-live="polite">
+            <h3>📊 Quick map insights</h3>
+            <div class="insight-grid"><div class="insight-tile"><span>Visible detections</span><strong>—</strong></div><div class="insight-tile"><span>High priority</span><strong>—</strong></div><div class="insight-tile"><span>Strongest heat (FRP)</span><strong>—</strong></div><div class="insight-tile"><span>Latest observation (UTC)</span><strong>—</strong></div></div>
+            <p class="insight-note">Satellite heat detections with 5m fire radius perimeter analysis.</p>
+          </div>
+          <div class="extra-insights" id="thermalInsights" aria-live="polite"><h3>🌡️ Thermal &amp; data quality</h3><div class="extra-grid"><div class="extra-stat"><span>Surface temperature</span><strong>Not supplied</strong></div><div class="extra-stat"><span>Average confidence</span><strong>—</strong></div></div><p class="temp-note">Temperature is shown only when your CSV contains a temperature_c, temp_c, or surface_temp_c column. FRP is a heat-power estimate, not a temperature.</p></div>
+          <div class="visual-guide" aria-label="Visual guide to reading the fire detection dashboard">
+            <h3>🧭 Visual guide: how to read the map</h3>
+            <div class="visual-guide-grid">
+              <article class="visual-guide-item">
+                <svg viewBox="0 0 220 108" role="img" aria-label="Illustration of a satellite detecting a heat hotspot">
+                  <defs><linearGradient id="vgEarth" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f5c58d"/><stop offset="1" stop-color="#d97735"/></linearGradient></defs>
+                  <path d="M0 83 Q42 58 82 78 T160 74 T220 77 V108 H0Z" fill="url(#vgEarth)" opacity=".7"/>
+                  <path d="M0 93 Q50 73 100 91 T220 88" fill="none" stroke="#9a3412" stroke-width="2" opacity=".55"/>
+                  <g transform="translate(76 24) rotate(-12)"><rect x="-15" y="-9" width="30" height="18" rx="3" fill="#6b777f" stroke="#39434a"/><rect x="-48" y="-13" width="27" height="26" rx="2" fill="#6ba6c8" stroke="#315d75"/><path d="M-39 -13v26 M-30 -13v26 M-48 0h27" stroke="#e5f5ff"/><rect x="21" y="-13" width="27" height="26" rx="2" fill="#6ba6c8" stroke="#315d75"/><path d="M30 -13v26 M39 -13v26 M21 0h27" stroke="#e5f5ff"/><path d="M0 9 L7 28" stroke="#39434a" stroke-width="3"/><circle cx="7" cy="36" r="12" fill="#d9534f" opacity=".18"/><circle cx="7" cy="36" r="6" fill="#d9534f"/><path d="M7 47v9" stroke="#9a3412" stroke-width="2" stroke-dasharray="3 3"/></g>
+                  <text x="129" y="24" font-size="10" fill="#7a3c1d">Satellite</text><path d="M124 27 L108 31" stroke="#9a3412" stroke-width="1.2"/><text x="93" y="103" font-size="10" fill="#713519">Heat spot</text>
+                </svg>
+                <strong>1. 5-Meter Fire Radius Rule</strong><p>If fire radius &ge; 5m, it triggers an ALERT. If less than 5m, no alert is triggered (monitored/confined).</p>
+              </article>
+              <article class="visual-guide-item">
+                <svg viewBox="0 0 220 108" role="img" aria-label="Illustration of red orange and yellow detection priority markers">
+                  <rect x="8" y="8" width="204" height="92" rx="10" fill="#f6efe6" stroke="#e6d9cb"/>
+                  <g><circle cx="40" cy="37" r="12" fill="#d9534f"/><circle cx="40" cy="37" r="4" fill="#fff"/><text x="62" y="41" font-size="12" font-weight="700" fill="#8f2922">Radius &ge; 5m (ALERT)</text>
+                  <circle cx="40" cy="62" r="9" fill="#176b50"/><text x="62" y="66" font-size="12" font-weight="700" fill="#176b50">Radius &lt; 5m (No Alert)</text>
+                  <circle cx="40" cy="84" r="6" fill="#e8912d"/><text x="62" y="88" font-size="12" font-weight="700" fill="#8a5200">Priority Review</text></g>
+                </svg>
+                <strong>2. Five Map Perspectives</strong><p>Explore via World Map, Thermal Infrared Map, Coordinates Grid Map, Lat/Lon Street Map, or real Satellite Imagery.</p>
+              </article>
+              <article class="visual-guide-item">
+                <svg viewBox="0 0 220 108" role="img" aria-label="Illustration of a map pin with latitude longitude and timestamp details">
+                  <rect x="8" y="8" width="204" height="92" rx="10" fill="#fffaf5" stroke="#e6d9cb"/>
+                  <path d="M50 22 C36 22 28 32 28 44 C28 60 50 78 50 78 S72 60 72 44 C72 32 64 22 50 22Z" fill="#b74716"/><circle cx="50" cy="43" r="8" fill="#fff4e8"/>
+                  <rect x="87" y="24" width="111" height="55" rx="7" fill="#f6efe6" stroke="#e6d9cb"/><text x="96" y="39" font-size="9" fill="#7a6a5f">LAT / LON</text><text x="96" y="51" font-size="10" font-weight="700" fill="#2a1f1a">17.3850, 78.4867</text><text x="96" y="66" font-size="9" fill="#7a6a5f">Grid Coordinates</text><text x="96" y="76" font-size="9" fill="#2a1f1a">Interactive layers</text>
+                </svg>
+                <strong>3. Select a dot for details</strong><p>Inspect exact coordinates, fire radius in meters, alert status, and switch between Coordinates, Grid, Thermal or Satellite maps.</p>
+              </article>
+            </div>
+            <p class="temp-note">Illustrations are explanatory examples. The coordinate and time shown in the third picture are sample values, not a live detection.</p>
+          </div>
+          <section class="friendly-help" aria-label="Helpful next steps">
+            <div class="friendly-help-head"><span class="friendly-help-icon">🧭</span><div><h3>What should I do next?</h3><p>Use this quick guide to turn the map into a clear review workflow.</p></div></div>
+            <div class="friendly-help-grid">
+              <article><span class="friendly-step">01</span><div><strong>Start with 5m radius alerts</strong><p>Check detections with fire radius &ge; 5m first. Spots &lt; 5m trigger no alert.</p></div></article>
+              <article><span class="friendly-step">02</span><div><strong>Open the details</strong><p>Select a dot or table row to check its latitude, longitude, observation time, fire radius, and score factors.</p></div></article>
+              <article><span class="friendly-step">03</span><div><strong>Switch map views</strong><p>Use Coordinates Grid Map for spatial indexing, Thermal Map for heat emission, World Map for global context, or Satellite map for ground photos.</p></div></article>
+              <article><span class="friendly-step">04</span><div><strong>Verify before acting</strong><p>Check recent imagery and official local or satellite sources. Contact emergency services if there is a credible immediate threat.</p></div></article>
+            </div>
+            <div class="friendly-glossary"><strong>Quick glossary</strong><span><b>Radius &ge; 5m</b> = Alert condition</span><span><b>Radius &lt; 5m</b> = No alert condition</span><span><b>FRP</b> = estimated heat power (MW)</span><span><b>Thermal IR</b> = radiative heat channel</span></div>
+          </section>
+        </section>
+        <section class="card">
+          <h2>Why this observation ranks here<span class="tip" tabindex="0" data-tip="Shows 5m fire radius alert status and how recency, confidence, heat and nearby detections add up to the score.">?</span></h2>
+          <div id="details" class="detailbox"><p class="empty">Select a point on the map or a row in the priority list.</p></div>
+          
+          
+          <div class="satbox" id="satBox">
+            <h3 style="margin:14px 0 0;font-size:15px">🛰️ Satellite image of this spot</h3>
+            <div class="presets" style="margin:8px 0">
+              <button class="secondary on" data-satsrc="esri">High-res</button>
+              <button class="secondary" data-satsrc="nasa">NASA daily</button>
+              <span class="small">Width:</span>
+              <button class="secondary" data-satspan="2">2 km</button>
+              <button class="secondary on" data-satspan="10">10 km</button>
+              <button class="secondary" data-satspan="60">60 km</button>
+              <button class="secondary" id="satRetry" title="Try loading the imagery again">↻ Retry</button>
+            </div>
+            <div class="satframe"><img id="satImg" alt="Satellite image centred on the selected detection"><div class="satcross"></div><svg id="satFallback" viewBox="0 0 520 340" role="img" aria-label="Local map of detections around the selected spot" style="display:none;position:absolute;inset:0;width:100%;height:100%"></svg><div class="satmsg" id="satMsg">Select a spot to load its satellite image.</div></div>
+            <p class="help" id="satCap"></p><p class="help" id="satLinks"></p>
+          </div>
+          <div class="brief" id="brief">
+            <h3>📋 Spot briefing</h3>
+            <div class="insight-grid" id="briefGrid"></div>
+            <svg id="briefChart" viewBox="0 0 260 96" role="img" aria-label="Heat power of detections near the selected spot over time"></svg>
+            <p class="help" id="briefNote"></p>
+            <div class="actions"><button class="secondary" id="copyCoords">Copy coordinates</button><button class="secondary" id="copyBrief">Copy briefing</button></div>
+          </div>
+        </section>
+      </div>
+      <div class="two even">
+        <section class="card"><div class="cardhead"><h2>🌍 World overview</h2><span class="small" id="worldCount"></span></div><div class="mapwrap" style="min-height:180px"><svg id="world" viewBox="0 0 360 180" style="width:100%;height:auto;cursor:crosshair" role="img" aria-label="World map overview"></svg></div><p class="help">Dots = visible spots. Click anywhere on the world map to jump to that coordinate region!</p></section>
+        <section class="card"><div class="cardhead"><h2>🎯 Mini scanner<span class="tip" tabindex="0" data-tip="Radar view of spots around the selected one. Pick 5, 10 or 25 km.">?</span></h2><div class="presets"><button class="secondary" data-rr="5">5 km</button><button class="secondary" data-rr="10">10 km</button><button class="secondary" data-rr="25">25 km</button></div></div><svg id="radar" viewBox="0 0 200 200" style="width:100%;max-width:260px;display:block;margin:8px auto" role="img" aria-label="Radar around the selected spot"></svg><p class="help" id="radarOut"></p></section>
+      </div>
+      <div class="two even"><section class="card" id="scanCard">
+        <div class="cardhead"><h2>📡 Cluster scanner<span class="tip" tabindex="0" data-tip="Finds groups of urgent spots close together. Press Scan.">?</span></h2><span class="small">Finds groups of spots close together</span></div>
+        <div class="timeline"><button id="scanBtn">📡 Scan</button><span class="small">Group radius <b id="radLabel">5 km</b></span><input id="radius" type="range" min="1" max="30" value="5" aria-label="Group radius in km"></div>
+        <div id="scanOut" class="help">Press Scan to sweep the map for groups of spots that need attention.</div>
+      </section>
+      <section class="card">
+        <div class="cardhead"><h2>Time-lapse</h2><span id="timelineLabel" class="small">Timeline off</span></div>
+        <div class="timeline"><button id="play">▶ Play</button><button class="secondary" id="timelineOff">Show latest</button><input id="timeline" type="range" min="0" max="1000" value="1000" disabled aria-label="Timeline time"><span id="timelineTime" class="small">—</span></div>
+        <p class="help">Play through observation times. During playback, filters and age are evaluated relative to the timeline time.</p>
+      </section>
+      </div>
+      <section class="card">
+        <div class="cardhead"><h2>Priority list<span class="tip" tabindex="0" data-tip="Highest score first. Displays 5-meter fire radius and alert status. Click any row to inspect.">?</span></h2><div class="actions"><button class="secondary" id="export" disabled>Export visible CSV</button></div></div>
+        <p class="help">Sorted by explainable score. Radius &ge; 5m triggers an alert; &lt; 5m triggers no alert.</p>
+        <div class="tablewrap"><table><thead><tr><th>Rank</th><th>5m Alert</th><th>Fire radius</th><th>Priority</th><th>Score</th><th>Time (UTC)</th><th>Coordinates</th><th>Location map</th><th>Area (nearest city)</th><th>Confidence</th><th>FRP MW</th><th>Nearby</th><th>Seen over</th></tr></thead><tbody id="tableBody"><tr><td colspan="13" class="empty">Loading observations...</td></tr></tbody></table></div>
+        <div style="text-align:center;margin-top:10px"><button class="secondary" id="more" hidden>Show all</button></div>
+      </section>
+      <section class="card field-guide" aria-label="Field verification guide">
+        <div class="cardhead"><h2>🧭 Field verification guide</h2><span class="small">A practical next-step checklist</span></div>
+        <p class="help" style="font-size:13px;margin:0 0 12px">Use these checks to decide what to investigate next. A heat detection alone does not confirm a wildfire.</p>
+        <div class="field-guide-grid">
+          <article><span class="field-guide-icon">📍</span><div><strong>1. Confirm the location</strong><p>Copy the selected latitude and longitude. Check whether the point is on land, near infrastructure, or in an area where heat sources are expected.</p></div></article>
+          <article><span class="field-guide-icon">📏</span><div><strong>2. Check the fire radius</strong><p>Review the 5-meter rule. If radius &ge; 5m, investigate as an active alert. If &lt; 5m, monitor as a sub-threshold spot.</p></div></article>
+          <article><span class="field-guide-icon">🕒</span><div><strong>3. Check when it was observed</strong><p>Review the UTC timestamp and data age. An old observation may no longer describe current conditions.</p></div></article>
+          <article><span class="field-guide-icon">🛰️</span><div><strong>4. Verify independently</strong><p>Compare with Satellite Image Map view, recent imagery, official fire reports, and local authorities before dispatching responders.</p></div></article>
+        </div>
+        <div class="field-guide-note"><strong>Safety reminder:</strong> If there is an immediate, credible threat, follow local emergency procedures. Do not approach a suspected fire to verify it yourself.</div>
+      </section>
+      <footer>
+        <strong>Data and limitations:</strong> Area names are the nearest city from a built-in list of about 200 major cities (works offline), so they are approximate. Demo records are generated locally and are clearly marked synthetic. Uploaded records are not sent to a server. NASA FIRMS data can include false positives and missed detections; clouds, sensor coverage, product choice, and observation time matter. Follow official NASA FIRMS documentation for the product you use.
+      </footer>
+    </section>
+  </div>
+</main>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const state = {
+    pins: new Set(),
+    notified: new Set(),
+    ext: null,
+    bg: '',
+    all: false,
+    rows: [],
+    rejected: [],
+    selected: null,
+    timelineTime: null,
+    playing: false,
+    raf: null,
+    startStamp: 0,
+    startTime: 0,
+    endTime: 0,
+    visible: [],
+    mapMode: 'coord'
+  };
+  const defaults = {hours:168, confidence:0, wRecency:30, wConfidence:25, wHeat:25, wRepeats:20, priority:'all', tNow:70, tSoon:45, country:'all', radiusFilter:'all'};
+  const PRE={bal:[30,25,25,20],new:[70,10,10,10],big:[10,15,60,15],rep:[10,15,15,60]};
+  const weights = () => ({r:+$('wRecency').value,c:+$('wConfidence').value,h:+$('wHeat').value,p:+$('wRepeats').value});
+  const maxOf=(a,f)=>{let m=-Infinity;for(const x of a){const v=f(x);if(v>m)m=v;}return m;};
+  const minOf=(a,f)=>{let m=Infinity;for(const x of a){const v=f(x);if(v<m)m=v;}return m;};
+  const dLon=(a,b)=>{let d=b-a;if(d>180)d-=360;else if(d<-180)d+=360;return d;};
+  const safeNum = v => v === '' || v == null ? NaN : Number(v);
+  const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let leafletMap = null;
+  let markersLayer = null;
+  let graticuleLayer = null;
+  let gridLayer = null;
+  let thermalLayer = null;
+  let tileCoords = null, tileSat = null, tileSatLabels = null, tileGridBase = null, tileThermalBase = null;
+
+  function initLeafletMap() {
+    if (typeof L === 'undefined') {
+      console.warn("Leaflet library not loaded, using SVG fallback mode.");
+      $('leafletMap').style.display = 'none';
+      $('map').style.display = 'block';
+      drawSvgMap();
+      return;
+    }
+    if (leafletMap) {
+      leafletMap.invalidateSize();
+      return;
+    }
+    try {
+      tileCoords = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap, © CARTO'
+      });
+      tileSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, maxNativeZoom: 17,
+        attribution: 'Tiles © Esri'
+      });
+      tileSatLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19
+      });
+      tileGridBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap, © CARTO'
+      });
+      tileThermalBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      });
+
+      const esriFallback = (layer, svc, nz) => {
+        let n = 0, done = false;
+        layer.on('tileerror', () => {
+          if (done || ++n < 3) return;
+          done = true;
+          layer.options.maxNativeZoom = nz;
+          layer.setUrl('https://server.arcgisonline.com/ArcGIS/rest/services/' + svc + '/MapServer/tile/{z}/{y}/{x}');
+        });
+      };
+      esriFallback(tileCoords, 'World_Street_Map', 18);
+      esriFallback(tileGridBase, 'Canvas/World_Dark_Gray_Base', 16);
+      esriFallback(tileThermalBase, 'Canvas/World_Dark_Gray_Base', 16);
+
+      leafletMap = L.map('leafletMap', {
+        preferCanvas: true,
+        center: [20, 10],
+        zoom: 3,
+        zoomControl: true,
+        layers: [tileCoords]
+      });
+
+      markersLayer = L.layerGroup().addTo(leafletMap);
+      graticuleLayer = L.layerGroup().addTo(leafletMap);
+      gridLayer = L.layerGroup();
+      thermalLayer = L.layerGroup();
+
+      leafletMap.on('mousemove', e => {
+        if ($('hudLat')) $('hudLat').textContent = e.latlng.lat.toFixed(4) + '°';
+        if ($('hudLon')) $('hudLon').textContent = e.latlng.lng.toFixed(4) + '°';
+        if ($('hudZoom')) $('hudZoom').textContent = leafletMap.getZoom();
+      });
+
+      leafletMap.on('zoomend', () => { if ($('hudZoom')) $('hudZoom').textContent = leafletMap.getZoom(); if (state.rows.length) drawLeafletMarkers(); });
+      leafletMap.on('moveend', () => {
+        if (state.mapMode === 'coord' || state.mapMode === 'grid') renderGraticule();
+        if (state.mapMode === 'grid') renderTacticalGrid();
+      });
+
+      renderGraticule();
+    } catch (e) {
+      console.warn("Leaflet error, using SVG fallback:", e);
+      $('leafletMap').style.display = 'none';
+      $('map').style.display = 'block';
+      drawSvgMap();
+    }
+  }
+
+  function renderGraticule() {
+    if (!leafletMap || !graticuleLayer) return;
+    graticuleLayer.clearLayers();
+    if (state.mapMode !== 'coord' && state.mapMode !== 'grid') return;
+
+    const bounds = leafletMap.getBounds();
+    const zoom = leafletMap.getZoom();
+    const step = zoom >= 13 ? 0.05 : zoom >= 10 ? 0.2 : zoom >= 7 ? 0.5 : zoom >= 5 ? 2.0 : zoom >= 3 ? 10.0 : 20.0;
+
+    const sLat = Math.floor(bounds.getSouth() / step) * step;
+    const eLat = Math.ceil(bounds.getNorth() / step) * step;
+    const sLng = Math.floor(bounds.getWest() / step) * step;
+    const eLng = Math.ceil(bounds.getEast() / step) * step;
+
+    for (let lat = sLat; lat <= eLat; lat += step) {
+      graticuleLayer.addLayer(L.polyline([[lat, -180], [lat, 180]], {
+        color: state.mapMode === 'grid' ? '#38bdf8' : '#9a3412',
+        weight: 1,
+        opacity: state.mapMode === 'grid' ? 0.45 : 0.25,
+        dashArray: '3, 4'
+      }));
+    }
+    for (let lng = sLng; lng <= eLng; lng += step) {
+      graticuleLayer.addLayer(L.polyline([[-85, lng], [85, lng]], {
+        color: state.mapMode === 'grid' ? '#38bdf8' : '#9a3412',
+        weight: 1,
+        opacity: state.mapMode === 'grid' ? 0.45 : 0.25,
+        dashArray: '3, 4'
+      }));
+    }
+  }
+
+  function renderTacticalGrid() {
+    if (!leafletMap || !gridLayer || state.mapMode !== 'grid') return;
+    gridLayer.clearLayers();
+    const bounds = leafletMap.getBounds();
+    const zoom = leafletMap.getZoom();
+    const step = zoom >= 10 ? 0.1 : zoom >= 7 ? 0.25 : zoom >= 5 ? 0.5 : 2.0;
+
+    const sLat = Math.floor(bounds.getSouth() / step) * step;
+    const eLat = Math.ceil(bounds.getNorth() / step) * step;
+    const sLng = Math.floor(bounds.getWest() / step) * step;
+    const eLng = Math.ceil(bounds.getEast() / step) * step;
+
+    const cellCounts = {};
+    state.visible.forEach(r => {
+      const k = `${(Math.floor(r.la / step) * step).toFixed(2)}_${(Math.floor(r.lo / step) * step).toFixed(2)}`;
+      cellCounts[k] = (cellCounts[k] || 0) + 1;
+    });
+
+    for (let lat = sLat; lat < eLat; lat += step) {
+      for (let lng = sLng; lng < eLng; lng += step) {
+        const k = `${lat.toFixed(2)}_${lng.toFixed(2)}`;
+        const count = cellCounts[k] || 0;
+        const color = count > 3 ? '#d9534f' : count > 0 ? '#e8912d' : '#334155';
+        const opacity = count > 3 ? 0.35 : count > 0 ? 0.18 : 0.04;
+
+        const rect = L.rectangle([[lat, lng], [lat + step, lng + step]], {
+          color: state.mapMode === 'grid' ? '#38bdf8' : color,
+          weight: 1,
+          opacity: 0.6,
+          fillColor: color,
+          fillOpacity: opacity
+        });
+        if (count > 0) {
+          rect.bindTooltip(`<b>Grid [${lat.toFixed(2)}°, ${lng.toFixed(2)}°]</b><br>${count} heat spot(s)`, {
+            direction: 'center',
+            className: 'grid-tip'
+          });
+        }
+        gridLayer.addLayer(rect);
+      }
+    }
+  }
+
+  function renderThermalMap() {
+    if (!leafletMap || !thermalLayer || state.mapMode !== 'thermal') return;
+    thermalLayer.clearLayers();
+    const maxFrpVal = Math.max(1, ...state.visible.map(r => r.frp));
+
+    state.visible.forEach(r => {
+      const isAlert = r.radiusAlert;
+      thermalLayer.addLayer(L.circle([r.la, r.lo], {
+        radius: Math.max(30, r.radius * 4.5),
+        color: '#7c3aed',
+        weight: 1,
+        fillColor: '#4338ca',
+        fillOpacity: 0.22,
+        opacity: 0.3
+      }));
+
+      thermalLayer.addLayer(L.circle([r.la, r.lo], {
+        radius: Math.max(15, r.radius * 2.2),
+        color: isAlert ? '#ef4444' : '#f59e0b',
+        weight: 1.5,
+        fillColor: isAlert ? '#dc2626' : '#d97706',
+        fillOpacity: 0.45,
+        opacity: 0.6
+      }));
+
+      const coreCircle = L.circle([r.la, r.lo], {
+        radius: Math.max(6, r.radius),
+        color: '#ffffff',
+        weight: 2,
+        fillColor: isAlert ? '#ffffff' : '#fef08a',
+        fillOpacity: 0.85,
+        opacity: 1
+      });
+      coreCircle.bindTooltip(`<b>Thermal Hotspot: ${r.frp.toFixed(1)} MW</b><br>Radius: ${r.radius.toFixed(1)}m ${isAlert ? '🚨 CRITICAL' : '🟢 SUB-THRESHOLD'}`, {
+        direction: 'top'
+      });
+      thermalLayer.addLayer(coreCircle);
+    });
+  }
+
+  function switchMapMode(mode) {
+    state.mapMode = mode;
+    $('mapModeCoord').classList.toggle('on', mode === 'coord');
+    $('mapModeGrid').classList.toggle('on', mode === 'grid');
+    $('mapModeThermal').classList.toggle('on', mode === 'thermal');
+    $('mapModeSat').classList.toggle('on', mode === 'sat');
+    $('mapModeWorld').classList.toggle('on', mode === 'world');
+    if ($('mapModePlot')) $('mapModePlot').classList.toggle('on', mode === 'plot');
+    store.set('fire_triage_mapmode', mode);
+
+    const modeNames = {
+      plot: 'Detection Plot (lat/lon)',
+      coord: 'Lat/Lon Coordinates',
+      grid: 'Coordinates Grid',
+      thermal: 'Thermal Infrared (FRP)',
+      sat: 'Satellite Imagery',
+      world: 'Global World Extent'
+    };
+    if ($('hudMode')) $('hudMode').textContent = modeNames[mode] || mode;
+    if ($('thermalRampBar')) $('thermalRampBar').style.display = mode === 'thermal' ? 'flex' : 'none';
+
+    const plotView = mode === 'plot' || !leafletMap;
+    if ($('leafletMap')) $('leafletMap').style.display = plotView ? 'none' : '';
+    if ($('map')) $('map').style.display = plotView ? 'block' : 'none';
+    if ($('hudCoordsBar')) $('hudCoordsBar').style.display = plotView ? 'none' : '';
+    if (plotView) {
+      drawSvgMap();
+      return;
+    }
+    leafletMap.invalidateSize();
+
+    leafletMap.removeLayer(tileCoords);
+    leafletMap.removeLayer(tileSat);
+    leafletMap.removeLayer(tileSatLabels);
+    leafletMap.removeLayer(tileGridBase);
+    leafletMap.removeLayer(tileThermalBase);
+    leafletMap.removeLayer(graticuleLayer);
+    leafletMap.removeLayer(gridLayer);
+    leafletMap.removeLayer(thermalLayer);
+
+    if (mode === 'coord') {
+      leafletMap.addLayer(tileCoords);
+      leafletMap.addLayer(graticuleLayer);
+      renderGraticule();
+    } else if (mode === 'grid') {
+      leafletMap.addLayer(tileGridBase);
+      leafletMap.addLayer(graticuleLayer);
+      leafletMap.addLayer(gridLayer);
+      renderGraticule();
+      renderTacticalGrid();
+    } else if (mode === 'thermal') {
+      leafletMap.addLayer(tileThermalBase);
+      leafletMap.addLayer(thermalLayer);
+      renderThermalMap();
+    } else if (mode === 'sat') {
+      leafletMap.addLayer(tileSat);
+      leafletMap.addLayer(tileSatLabels);
+    } else if (mode === 'world') {
+      leafletMap.addLayer(tileCoords);
+      leafletMap.setView([20, 0], 2);
+    }
+
+    drawLeafletMarkers();
+  }
+
+  function popupHtml(r){
+    const isAlert=r.radiusAlert,dot=isAlert?'#d9534f':'#176b50';
+    return `<div style="font-size:12px;line-height:1.45;min-width:210px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;"><b>Detection #${r.rank}</b>
+      <span class="pill ${isAlert?'red':'green'}">${isAlert?'🚨 ALERT (≥5m)':'🟢 NO ALERT (&lt;5m)'}</span></div>
+      <div><b>Fire radius:</b> <span style="font-size:13px;font-weight:800;color:${dot}">${r.radius.toFixed(1)} meters</span></div>
+      <div><b>Coordinates:</b> ${r.la.toFixed(4)}°, ${r.lo.toFixed(4)}°</div>
+      <div><b>FRP heat:</b> ${r.frp.toFixed(1)} MW</div>
+      <div><b>Area:</b> ${escapeHtml(r.place)}</div>
+      <div style="font-size:11px;color:#7a6a5f;margin-top:2px;">${escapeHtml(r.iso)}</div></div>`;
+  }
+  function drawLeafletMarkers() {
+    if (!leafletMap || !markersLayer) return;
+    markersLayer.clearLayers();
+    if (state.mapMode === 'thermal') { renderThermalMap(); return; }
+    const zoom = leafletMap.getZoom();
+    const sel = state.visible.find(r => r.id === state.selected);
+    state.visible.forEach(r => {
+      if (r === sel) return;
+      const c = r.radiusAlert ? '#d9534f' : '#176b50';
+      const m = L.circleMarker([r.la, r.lo], { radius: r.radiusAlert ? 6 : 5, color: '#fff', weight: 1.5, fillColor: c, fillOpacity: .92 });
+      m.on('click', () => { L.popup({ offset: [0, -4] }).setLatLng([r.la, r.lo]).setContent(popupHtml(r)).openOn(leafletMap); state.selected = r.id; scheduleRender(); });
+      markersLayer.addLayer(m);
+      if (zoom >= 13) markersLayer.addLayer(L.circle([r.la, r.lo], { radius: r.radius, color: c, weight: 1, opacity: .8, fillColor: c, fillOpacity: .15, interactive: false }));
+    });
+    if (sel) {
+      const c = sel.radiusAlert ? '#d9534f' : '#176b50';
+      markersLayer.addLayer(L.circle([sel.la, sel.lo], { radius: sel.radius, color: c, weight: 2.5, fillColor: c, fillOpacity: .35, interactive: false }));
+      if (zoom >= 15) markersLayer.addLayer(L.circle([sel.la, sel.lo], { radius: 5, color: '#9a3412', weight: 1, dashArray: '2, 3', fill: false, interactive: false }));
+      if (sel.radiusAlert) markersLayer.addLayer(L.marker([sel.la, sel.lo], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'fire-icon-wrap', iconSize: [18, 18], iconAnchor: [9, 9], html: '<div style="position:relative;"><div class="pulse-beacon-5m"></div></div>' }) }));
+      const m = L.circleMarker([sel.la, sel.lo], { radius: 9, color: '#fff', weight: 3, fillColor: c, fillOpacity: 1 });
+      m.on('click', () => L.popup({ offset: [0, -6] }).setLatLng([sel.la, sel.lo]).setContent(popupHtml(sel)).openOn(leafletMap));
+      markersLayer.addLayer(m);
+    }
+  }
+
+  function drawSvgMap() {
+    const svg = $('map');
+    if (!svg || svg.offsetParent === null) return;
+    const list = state.visible.slice(0, 1500);
+    if (!list.length) {
+      svg.innerHTML = '<text x="20" y="30" fill="#7a6a5f">No matching detections.</text>';
+      return;
+    }
+    let minLon = minOf(list, r=>r.lo), maxLon = maxOf(list, r=>r.lo);
+    let minLat = minOf(list, r=>r.la), maxLat = maxOf(list, r=>r.la);
+    if (maxLon - minLon < 0.05) { minLon -= 0.05; maxLon += 0.05; }
+    if (maxLat - minLat < 0.05) { minLat -= 0.05; maxLat += 0.05; }
+    const padX = (maxLon - minLon) * 0.08, padY = (maxLat - minLat) * 0.08;
+    minLon -= padX; maxLon += padX; minLat -= padY; maxLat += padY;
+    const X = lon => 55 + (lon - minLon) / (maxLon - minLon) * 500;
+    const Y = lat => 345 - (lat - minLat) / (maxLat - minLat) * 300;
+
+    let out = '<rect width="600" height="400" fill="#efe6da"/>';
+    for (let i = 0; i <= 4; i++) {
+      const lon = minLon + (maxLon - minLon) * i / 4;
+      const lat = minLat + (maxLat - minLat) * i / 4;
+      out += `<line x1="${X(lon)}" x2="${X(lon)}" y1="25" y2="345" stroke="#e0d4c5"/><text x="${X(lon)}" y="366" text-anchor="middle" font-size="10" fill="#7a6a5f">${lon.toFixed(2)}°</text>`;
+      out += `<line x1="45" x2="565" y1="${Y(lat)}" y2="${Y(lat)}" stroke="#e0d4c5"/><text x="4" y="${Y(lat)+3}" font-size="10" fill="#7a6a5f">${lat.toFixed(2)}°</text>`;
+    }
+    const dotCol = r => r.priority === 'Check now' ? '#d9534f' : r.priority === 'Check soon' ? '#e8912d' : '#e0b83a';
+    list.slice().reverse().forEach(r => {
+      const fill = dotCol(r), sel = state.selected === r.id;
+      const rad = Math.max(4, Math.min(9, 3.5 + Math.sqrt(Math.max(+r.frp || 0, 0)) * 0.7));
+      out += `<circle data-id="${r.id}" cx="${X(r.lo)}" cy="${Y(r.la)}" r="${sel ? rad + 1.5 : rad}" fill="${fill}" fill-opacity=".95" stroke="${sel ? '#2a1f1a' : '#fff'}" stroke-width="${sel ? 3 : 1.6}" style="cursor:pointer"><title>${r.la.toFixed(3)}°, ${r.lo.toFixed(3)}° | FRP ${(+r.frp || 0).toFixed(1)} MW | ${escapeHtml(r.priority || '')} | ${r.radiusAlert ? '5m ALERT' : 'no 5m alert'}</title></circle>`;
+    });
+    svg.innerHTML = out;
+    svg.querySelectorAll('circle[data-id]').forEach(c => {
+      c.onclick = () => { state.selected = Number(c.dataset.id); render(); };
+    });
+  }
+
+  window.selectSpot = function(id) {
+    state.selected = Number(id);
+    render();
+  };
+
+  function parseCSV(text) {
+    const out=[]; let row=[], field='', quoted=false;
+    for(let i=0;i<text.length;i++){
+      const ch=text[i];
+      if(quoted){
+        if(ch==='"' && text[i+1]==='"'){field+='"';i++;}
+        else if(ch==='"') quoted=false;
+        else field+=ch;
+      } else {
+        if(ch==='"' && field==='') quoted=true;
+        else if(ch===','){row.push(field);field='';}
+        else if(ch==='\n'){row.push(field.replace(/\r$/,''));out.push(row);row=[];field='';}
+        else field+=ch;
+      }
+    }
+    if(quoted) throw new Error('CSV contains an opening quote without a closing quote.');
+    if(field.length || row.length){row.push(field.replace(/\r$/,''));out.push(row);}
+    return out.filter(r=>r.some(c=>String(c).trim()!==''));
+  }
+  const CITIES=`Hyderabad,Telangana,India,17.39,78.49;Warangal,Telangana,India,17.97,79.59;Karimnagar,Telangana,India,18.44,79.13;Nizamabad,Telangana,India,18.67,78.09;Khammam,Telangana,India,17.25,80.15;Adilabad,Telangana,India,19.66,78.53;Kothagudem,Telangana,India,17.55,80.62;Nagpur,Maharashtra,India,21.15,79.09;Chandrapur,Maharashtra,India,19.96,79.30;Gadchiroli,Maharashtra,India,20.18,80.00;Jagdalpur,Chhattisgarh,India,19.08,82.02;Raipur,Chhattisgarh,India,21.25,81.63;Bilaspur,Chhattisgarh,India,22.08,82.15;Vijayawada,Andhra Pradesh,India,16.51,80.65;Visakhapatnam,Andhra Pradesh,India,17.69,83.22;Guntur,Andhra Pradesh,India,16.31,80.44;Kurnool,Andhra Pradesh,India,15.83,78.04;Rajahmundry,Andhra Pradesh,India,17.00,81.78;Tirupati,Andhra Pradesh,India,13.63,79.42;Bhopal,Madhya Pradesh,India,23.26,77.41;Indore,Madhya Pradesh,India,22.72,75.86;Jabalpur,Madhya Pradesh,India,23.18,79.99;Mumbai,Maharashtra,India,19.08,72.88;Pune,Maharashtra,India,18.52,73.86;Nashik,Maharashtra,India,20.00,73.79;Aurangabad,Maharashtra,India,19.88,75.34;Solapur,Maharashtra,India,17.66,75.91;Bengaluru,Karnataka,India,12.97,77.59;Mysuru,Karnataka,India,12.30,76.64;Belagavi,Karnataka,India,15.85,74.50;Kalaburagi,Karnataka,India,17.33,76.83;Chennai,Tamil Nadu,India,13.08,80.27;Coimbatore,Tamil Nadu,India,11.02,76.96;Madurai,Tamil Nadu,India,9.93,78.12;Kochi,Kerala,India,9.93,76.27;Thiruvananthapuram,Kerala,India,8.52,76.94;Bhubaneswar,Odisha,India,20.30,85.82;Koraput,Odisha,India,18.81,82.71;Ranchi,Jharkhand,India,23.34,85.31;Kolkata,West Bengal,India,22.57,88.36;Patna,Bihar,India,25.59,85.14;Lucknow,Uttar Pradesh,India,26.85,80.95;Varanasi,Uttar Pradesh,India,25.32,82.97;Delhi,,India,28.61,77.21;Jaipur,Rajasthan,India,26.91,75.79;Jodhpur,Rajasthan,India,26.24,73.02;Ahmedabad,Gujarat,India,23.02,72.57;Dehradun,Uttarakhand,India,30.32,78.03;Shimla,Himachal Pradesh,India,31.10,77.17;Srinagar,Jammu and Kashmir,India,34.08,74.80;Guwahati,Assam,India,26.14,91.74;Imphal,Manipur,India,24.82,93.94;Amritsar,Punjab,India,31.63,74.87;Panaji,Goa,India,15.50,73.83;Dhaka,,Bangladesh,23.81,90.41;Kathmandu,,Nepal,27.72,85.32;Colombo,,Sri Lanka,6.93,79.86;Karachi,Sindh,Pakistan,24.86,67.01;Lahore,Punjab,Pakistan,31.55,74.34;Kabul,,Afghanistan,34.53,69.17;Bangkok,,Thailand,13.76,100.50;Chiang Mai,,Thailand,18.79,98.98;Hanoi,,Vietnam,21.03,105.85;Ho Chi Minh City,,Vietnam,10.82,106.63;Yangon,,Myanmar,16.87,96.20;Vientiane,,Laos,17.97,102.60;Phnom Penh,,Cambodia,11.56,104.92;Kuala Lumpur,,Malaysia,3.14,101.69;Singapore,,Singapore,1.35,103.82;Jakarta,Java,Indonesia,-6.21,106.85;Pekanbaru,Riau,Indonesia,0.51,101.45;Palembang,South Sumatra,Indonesia,-2.98,104.76;Pontianak,West Kalimantan,Indonesia,-0.03,109.34;Palangkaraya,Central Kalimantan,Indonesia,-2.21,113.92;Makassar,Sulawesi,Indonesia,-5.15,119.43;Manila,,Philippines,14.60,120.98;Beijing,,China,39.90,116.41;Shanghai,,China,31.23,121.47;Chengdu,Sichuan,China,30.57,104.07;Kunming,Yunnan,China,25.04,102.71;Harbin,Heilongjiang,China,45.80,126.53;Tokyo,,Japan,35.68,139.69;Seoul,,South Korea,37.57,126.98;Ulaanbaatar,,Mongolia,47.89,106.91;Moscow,,Russia,55.76,37.62;Novosibirsk,,Russia,55.01,82.93;Krasnoyarsk,,Russia,56.01,92.85;Irkutsk,,Russia,52.29,104.30;Yakutsk,Sakha,Russia,62.03,129.73;Chita,Zabaykalsky,Russia,52.03,113.50;Vladivostok,,Russia,43.12,131.89;Almaty,,Kazakhstan,43.24,76.89;Astana,,Kazakhstan,51.17,71.45;Tehran,,Iran,35.69,51.39;Baghdad,,Iraq,33.31,44.37;Istanbul,,Turkey,41.01,28.98;Ankara,,Turkey,39.93,32.86;Antalya,,Turkey,36.90,30.71;Athens,,Greece,37.98,23.73;Thessaloniki,,Greece,40.64,22.94;Rome,,Italy,41.90,12.50;Palermo,Sicily,Italy,38.12,13.36;Cagliari,Sardinia,Italy,39.22,9.12;Madrid,,Spain,40.42,-3.70;Seville,Andalusia,Spain,37.39,-5.98;Barcelona,Catalonia,Spain,41.39,2.17;Lisbon,,Portugal,38.72,-9.14;Porto,,Portugal,41.15,-8.61;Marseille,,France,43.30,5.37;Paris,,France,48.86,2.35;London,,United Kingdom,51.51,-0.13;Berlin,,Germany,52.52,13.41;Kyiv,,Ukraine,50.45,30.52;Bucharest,,Romania,44.43,26.10;Sofia,,Bulgaria,42.70,23.32;Stockholm,,Sweden,59.33,18.07;Cairo,,Egypt,30.04,31.24;Algiers,,Algeria,36.75,3.06;Casablanca,,Morocco,33.57,-7.59;Dakar,,Senegal,14.72,-17.47;Bamako,,Mali,12.64,-8.00;Ouagadougou,,Burkina Faso,12.37,-1.52;Lagos,,Nigeria,6.52,3.38;Abuja,,Nigeria,9.08,7.40;Kano,,Nigeria,12.00,8.52;Accra,,Ghana,5.60,-0.19;Abidjan,,Ivory Coast,5.36,-4.01;Khartoum,,Sudan,15.50,32.56;Addis Ababa,,Ethiopia,9.03,38.74;Nairobi,,Kenya,-1.29,36.82;Kampala,,Uganda,0.35,32.58;Kinshasa,,DR Congo,-4.44,15.27;Lubumbashi,,DR Congo,-11.66,27.48;Luanda,,Angola,-8.84,13.23;Dar es Salaam,,Tanzania,-6.79,39.21;Lusaka,,Zambia,-15.39,28.32;Harare,,Zimbabwe,-17.83,31.05;Maputo,,Mozambique,-25.97,32.57;Antananarivo,,Madagascar,-18.88,47.51;Johannesburg,,South Africa,-26.20,28.05;Cape Town,,South Africa,-33.92,18.42;Windhoek,,Namibia,-22.56,17.08;Ottawa,Ontario,Canada,45.42,-75.70;Vancouver,British Columbia,Canada,49.28,-123.12;Kelowna,British Columbia,Canada,49.89,-119.50;Calgary,Alberta,Canada,51.05,-114.07;Fort McMurray,Alberta,Canada,56.73,-111.38;Yellowknife,Northwest Territories,Canada,62.45,-114.37;Winnipeg,Manitoba,Canada,49.90,-97.14;Seattle,Washington,USA,47.61,-122.33;Portland,Oregon,USA,45.52,-122.68;Boise,Idaho,USA,43.62,-116.20;Sacramento,California,USA,38.58,-121.49;San Francisco,California,USA,37.77,-122.42;Los Angeles,California,USA,34.05,-118.24;San Diego,California,USA,32.72,-117.16;Redding,California,USA,40.59,-122.39;Las Vegas,Nevada,USA,36.17,-115.14;Phoenix,Arizona,USA,33.45,-112.07;Salt Lake City,Utah,USA,40.76,-111.89;Denver,Colorado,USA,39.74,-104.99;Albuquerque,New Mexico,USA,35.08,-106.65;Billings,Montana,USA,45.78,-108.50;Anchorage,Alaska,USA,61.22,-149.90;Fairbanks,Alaska,USA,64.84,-147.72;Dallas,Texas,USA,32.78,-96.80;Houston,Texas,USA,29.76,-95.37;Chicago,Illinois,USA,41.88,-87.63;Atlanta,Georgia,USA,33.75,-84.39;Miami,Florida,USA,25.76,-80.19;New York,New York,USA,40.71,-74.01;Mexico City,,Mexico,19.43,-99.13;Guadalajara,Jalisco,Mexico,20.67,-103.35;Monterrey,Nuevo Leon,Mexico,25.69,-100.32;Guatemala City,,Guatemala,14.63,-90.51;Havana,,Cuba,23.11,-82.37;Bogota,,Colombia,4.71,-74.07;Caracas,,Venezuela,10.48,-66.90;Lima,,Peru,-12.05,-77.04;Quito,,Ecuador,-0.18,-78.47;La Paz,,Bolivia,-16.49,-68.12;Santa Cruz,,Bolivia,-17.78,-63.18;Manaus,Amazonas,Brazil,-3.12,-60.02;Porto Velho,Rondonia,Brazil,-8.76,-63.90;Cuiaba,Mato Grosso,Brazil,-15.60,-56.10;Brasilia,,Brazil,-15.79,-47.88;Sao Paulo,,Brazil,-23.55,-46.63;Rio de Janeiro,,Brazil,-22.91,-43.17;Belem,Para,Brazil,-1.46,-48.50;Palmas,Tocantins,Brazil,-10.18,-48.33;Santiago,,Chile,-33.45,-70.67;Concepcion,,Chile,-36.83,-73.05;Buenos Aires,,Argentina,-34.60,-58.38;Asuncion,,Paraguay,-25.26,-57.58;Sydney,New South Wales,Australia,-33.87,151.21;Canberra,ACT,Australia,-35.28,149.13;Melbourne,Victoria,Australia,-37.81,144.96;Brisbane,Queensland,Australia,-27.47,153.03;Perth,Western Australia,Australia,-31.95,115.86;Adelaide,South Australia,Australia,-34.93,138.60;Darwin,Northern Territory,Australia,-12.46,130.84;Alice Springs,Northern Territory,Australia,-23.70,133.88;Hobart,Tasmania,Australia,-42.88,147.33;Auckland,,New Zealand,-36.85,174.76;Port Moresby,,Papua New Guinea,-9.44,147.18;Sapporo,Hokkaido,Japan,43.06,141.35;Manaus,Amazonas,Brazil,-3.12,-60.02;Porto Velho,Rondonia,Brazil,-8.76,-63.90;Edmonton,Alberta,Canada,53.55,-113.49;Kananga,,DR Congo,-5.90,22.42;Bratsk,,Russia,56.15,101.63;Irkutsk,,Russia,52.29,104.28`.split(';').map(x=>{const a=x.split(',');return{n:a[0],r:a[1],c:a[2],la:+a[3],lo:+a[4]}});
+  function place(la,lo){let best=null,bd=1e9;const rad=Math.PI/180;for(const c of CITIES){const x=dLon(lo,c.lo)*rad*Math.cos((c.la+la)/2*rad),y=(c.la-la)*rad,d=6371*Math.hypot(x,y);if(d<bd){bd=d;best=c}}
+    const full=best.n+(best.r?', '+best.r:'')+', '+best.c,km=Math.round(bd),far=bd>=300;
+    return{c:far?'Remote / offshore':best.c,label:bd<30?full:far?'Offshore / remote (~'+km+' km from '+best.n+')':full+' (~'+km+' km)',long:bd<30?'In the '+best.n+' area, '+(best.r?best.r+', ':'')+best.c:far?'Offshore or very remote, about '+km+' km from '+full:'About '+km+' km from '+full};}
+  
+  function makeDemoCSV(){
+    let seed=41; const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+    const lines=['latitude,longitude,acq_date,acq_time,confidence,frp,satellite,fire_radius_m'];
+    const start=Date.UTC(2026,9,10,0,0);
+    const add=(la,lo,t,conf,frp,radVal)=>{
+      const d=new Date(t);
+      lines.push([la.toFixed(5),lo.toFixed(5),d.toISOString().slice(0,10),d.toISOString().slice(11,16).replace(':',''),conf,frp.toFixed(1),'SYNTHETIC',radVal.toFixed(1)].join(','));
+    };
+    const pick=()=>rand()<.2?'l':rand()<.55?'n':'h';
+    [[38.5,-121.5],[56,105],[43,142.5],[-9,-60],[-33,148],[-3,22],[18.5,79.5],[38.5,22],[40,-5.5],[54,-115]].forEach(([la,lo])=>{
+      const base=start+rand()*3*86400000;
+      for(let j=0;j<11;j++){
+        const isSub5m = (j % 3 === 0);
+        const frp = isSub5m ? (0.4 + rand() * 1.6) : (3.5 + rand() * 26);
+        const radiusM = isSub5m ? (2.1 + rand() * 2.6) : (5.2 + Math.sqrt(frp) * 2.1 + rand() * 3);
+        add(la+(rand()-.5)*.14,lo+(rand()-.5)*.14,base+rand()*2*86400000,pick(),frp,radiusM);
+      }
+    });
+    [[26,-92],[57,2],[16,65],[30,-140],[-20,-150]].forEach(([la,lo])=>{
+      for(let j=0;j<3;j++){
+        const frp = 2+rand()*10;
+        const radiusM = 3.5 + rand()*4;
+        add(la+(rand()-.5)*3,lo+(rand()-.5)*3,start+rand()*6.5*86400000,rand()<.6?'l':'n',frp,radiusM);
+      }
+    });
+    for(let j=0;j<30;j++){
+      const frp = rand()*8;
+      const radiusM = (j % 2 === 0) ? (2.2 + rand() * 2.5) : (5.5 + rand() * 12);
+      add(-45+rand()*100,-130+rand()*290,start+rand()*6.5*86400000,rand()<.45?'l':rand()<.7?'n':'h',frp,radiusM);
+    }
+    return lines.join('\n');
+  }
+
+  function confidenceValue(v){
+    const s=String(v??'').trim().toLowerCase();
+    if(!s) return {value:.5,label:'Not provided (assumed 50%)'};
+    if(['l','low'].includes(s)) return {value:.25,label:'Low'};
+    if(['n','nominal','medium','moderate'].includes(s)) return {value:.6,label:'Nominal'};
+    if(['h','high'].includes(s)) return {value:.9,label:'High'};
+    const n=Number(s);
+    if(Number.isFinite(n)&&n>=0&&n<=100) return {value:n/100,label:`${n}%`};
+    return null;
+  }
+
+  function parseData(text){
+    const grid=parseCSV(text);
+    if(grid.length<2) throw new Error('CSV has a header but no observation rows.');
+    const headers=grid.shift().map(h=>h.trim().replace(/^\uFEFF/,'').toLowerCase());
+    const required=['latitude','longitude','acq_date','acq_time'];
+    const missing=required.filter(h=>!headers.includes(h));
+    if(missing.length) throw new Error('Missing required column(s): '+missing.join(', '));
+    const parsed=[], rejected=[], seen=new Set();
+    grid.forEach((cells,idx)=>{
+      const o={};headers.forEach((h,j)=>o[h]=(cells[j]??'').trim());
+      const la=safeNum(o.latitude),lo=safeNum(o.longitude);
+      const date=o.acq_date, tm=String(o.acq_time||'').trim().padStart(4,'0');
+      const errors=[];
+      if(!Number.isFinite(la)||la < -90||la>90) errors.push('invalid latitude');
+      if(!Number.isFinite(lo)||lo < -180||lo>180) errors.push('invalid longitude');
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{4}$/.test(tm)||+tm.slice(0,2)>23||+tm.slice(2)>59) errors.push('invalid date/time');
+      const time=errors.includes('invalid date/time')?NaN:Date.parse(`${date}T${tm.slice(0,2)}:${tm.slice(2)}:00Z`);
+      if(!errors.includes('invalid date/time')){if(!Number.isFinite(time)||new Date(time).toISOString().slice(0,10)!==date) errors.push('invalid calendar date');}
+      const conf=confidenceValue(o.confidence);
+      if(!conf) errors.push('invalid confidence');
+      let frp=0, frpMissing=!o.frp;
+      if(!frpMissing){frp=Number(o.frp);if(!Number.isFinite(frp)||frp<0)errors.push('invalid FRP');}
+      const sat=o.satellite||'';
+
+      let radiusM = safeNum(o.fire_radius_m || o.radius_m || o.radius || o.fire_radius);
+      if (!Number.isFinite(radiusM) || radiusM <= 0) {
+        radiusM = Math.max(1.8, Math.round((2.0 + Math.sqrt(frp * 2.4)) * 10) / 10);
+      }
+
+      const key=[la.toFixed(5),lo.toFixed(5),date,tm,sat].join('|');
+      if(seen.has(key)) errors.push('duplicate record'); else seen.add(key);
+      if(errors.length){rejected.push({line:idx+2,reason:errors.join('; ')});return;}
+      const tempRaw=o.temperature_c||o.temp_c||o.surface_temp_c||'';
+      const tempC=tempRaw.trim()!==''&&Number.isFinite(Number(tempRaw))?Number(tempRaw):null;
+
+      const radiusAlert = radiusM >= 5.0;
+
+      parsed.push({
+        id:parsed.length,
+        la,lo,t:time,
+        confidence:conf.value,
+        confidenceLabel:conf.label,
+        frp,frpMissing,tempC,
+        radius:radiusM,
+        radiusAlert:radiusAlert,
+        satellite:sat,
+        synthetic:sat.toUpperCase()==='SYNTHETIC',
+        iso:new Date(time).toISOString().slice(0,16).replace('T',' ')+' UTC'
+      });
+    });
+    if(!parsed.length) throw new Error('No valid observations found. Check the required columns and data formats.');
+    const maxT=maxOf(parsed,r=>r.t);
+    parsed.forEach(r=>r.age=(maxT-r.t)/3600000);
+
+    const rad=Math.PI/180, km=(a,b)=>{const x=dLon(a.lo,b.lo)*rad*Math.cos((a.la+b.la)/2*rad),y=(b.la-a.la)*rad;return 6371*Math.hypot(x,y);};
+    const CELL=0.1, grid2=new Map(), cx=r=>Math.floor(r.lo/CELL), cy=r=>Math.floor(r.la/CELL), nx=Math.round(360/CELL);
+    parsed.forEach(r=>{const k=cy(r)*100000+cx(r);(grid2.get(k)||grid2.set(k,[]).get(k)).push(r);});
+    parsed.forEach(a=>{
+      a.nearby=0;let first=a,last=a;const ax=cx(a),ay=cy(a);
+      const span=Math.ceil(2/(111.32*Math.max(.05,Math.cos(a.la*rad))*CELL))+1;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-span;dx<=span;dx++){
+        let gx=ax+dx;if(gx<-nx/2)gx+=nx;else if(gx>=nx/2)gx-=nx;
+        const cell=grid2.get((ay+dy)*100000+gx);if(!cell)continue;
+        for(const b of cell){if(a===b||km(a,b)>2)continue;if(Math.abs(a.t-b.t)<=48*3600000)a.nearby++;if(b.t<first.t)first=b;if(b.t>last.t)last=b;}
+      }
+      a.persist=(last.t-first.t)/3600000;a.growing=last!==first&&last.frp>=first.frp*1.25&&last.frp-first.frp>=1;
+    });
+    const frps=parsed.map(r=>r.frp).sort((a,b)=>a-b);
+    const p95=Math.max(frps[Math.floor(.95*(frps.length-1))]||0,1);
+    parsed.forEach(r=>{
+      r.factorRecency=Math.exp(-r.age*Math.LN2/12);
+      r.factorConfidence=r.confidence;
+      r.factorHeat=Math.min(1,Math.log1p(r.frp)/Math.log1p(p95));
+      r.factorNearby=Math.min(r.nearby,4)/4;
+    });
+    parsed.forEach(r=>{const p=place(r.la,r.lo);r.place=p.label;r.placeLong=p.long;r.country=p.c});
+    if ($('country')) $('country').innerHTML='<option value="all">All countries</option>'+[...new Set(parsed.map(r=>r.country))].sort().map(c=>'<option>'+escapeHtml(c)+'</option>').join('');
+    state.pins.clear();state.notified.clear();state.ext=null;state.all=false;state.rows=parsed;state.rejected=rejected;state.selected=parsed[0]?.id??null;state.timelineTime=null;
+    state.startTime=minOf(parsed,r=>r.t);state.endTime=maxT;
+    {const spanH=Math.ceil((maxT-state.startTime)/3600000/6)*6,hmax=Math.max(168,spanH);if($('hours')){ $('hours').max=hmax;defaults.hours=hmax;$('hours').value=hmax;}}
+    if ($('timeline')) { $('timeline').disabled=parsed.length<2; $('timeline').value=1000; }
+    if ($('dataBadge')) $('dataBadge').textContent=parsed.some(r=>r.synthetic)?'Synthetic demo data':'Uploaded observations';
+    if ($('fileMessage')) {
+      $('fileMessage').textContent=`Loaded ${parsed.length} valid row(s); ${rejected.length} rejected.`;
+      $('fileMessage').className=rejected.length?'help':'success';
+    }
+    if ($('error')) $('error').style.display='none';
+    document.querySelector('.layout').classList.remove('nodata');
+
+    initLeafletMap();
+    if (leafletMap && parsed.length) {
+      const lats = parsed.map(r => r.la);
+      const lons = parsed.map(r => r.lo);
+      leafletMap.fitBounds([[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]], { padding: [35, 35] });
+      leafletMap.invalidateSize();
+    }
+
+    render();
+    if(state.visible[0]){state.selected=state.visible[0].id;render();}
+  }
+
+  function score(r){
+    const w=weights(),total=w.r+w.c+w.h+w.p||1;
+    r.score=100*(w.r*r.factorRecency+w.c*r.factorConfidence+w.h*r.factorHeat+w.p*r.factorNearby)/total;
+    {const tn=+$('tNow').value,ts=Math.min(+$('tSoon').value,tn);r.priority=r.score>=tn?'Check now':r.score>=ts?'Check soon':'Keep watching';}
+    return r.score;
+  }
+  const priorityClass=p=>p==='Check now'?'red':p==='Check soon'?'orange':'yellow';
+
+  function getVisible(ignorePriority){
+    const ref=state.timelineTime===null?state.endTime:state.timelineTime;
+    const ageLimit=+$('hours').value, minConf=+$('confidence').value/100, priority=$('priority').value,country=$('country').value,pinOnly=$('pinOnly').checked;
+    const radiusFilter = $('radiusFilter').value;
+
+    return state.rows.filter(r=>(state.timelineTime===null||r.t<=state.timelineTime)&&
+      ((ref-r.t)/3600000)<=ageLimit&&
+      r.confidence>=minConf&&
+      (!$('hideOneOff').checked||r.persist>=+$('minSeen').value)&&
+      (ignorePriority||priority==='all'||r.priority===priority)&&
+      (country==='all'||r.country===country)&&
+      (!pinOnly||state.pins.has(r.id))&&
+      (radiusFilter==='all' || (radiusFilter==='alert' && r.radiusAlert) || (radiusFilter==='safe' && !r.radiusAlert))
+    ).sort((a,b)=>b.score-a.score);
+  }
+
+  function render(){
+    if(!state.rows.length)return;
+    const referenceTime = state.timelineTime === null ? state.endTime : state.timelineTime;
+    state.rows.forEach(r => {
+      const ageHours = Math.max(0, (referenceTime - r.t) / 3600000);
+      r.factorRecency = Math.exp(-ageHours * Math.LN2 / 12);
+      score(r);
+    });
+    state.visible=getVisible();
+    const base=getVisible(true);
+    state.visible.forEach((r,i)=>r.rank=i+1);
+    if ($('hoursLabel')) $('hoursLabel').textContent=+$('hours').value+' hours';
+    if ($('confidenceLabel')) $('confidenceLabel').textContent=+$('confidence').value+'%';
+    const w=weights();
+    [['wRecency','r'],['wConfidence','c'],['wHeat','h'],['wRepeats','p']].forEach(([id,k])=>{if($(id+'Label'))$(id+'Label').textContent=w[k]+'%';});
+    
+    if ($('shownCount')) $('shownCount').textContent=state.visible.length;
+    if ($('nowCount')) $('nowCount').textContent=base.filter(r=>r.priority==='Check now').length;
+    if ($('soonCount')) $('soonCount').textContent=base.filter(r=>r.priority==='Check soon').length;
+    if ($('watchCount')) $('watchCount').textContent=base.filter(r=>r.priority==='Keep watching').length;
+    
+    const alertCount = base.filter(r=>r.radiusAlert).length;
+    const safeCount = base.filter(r=>!r.radiusAlert).length;
+    if ($('alert5mCount')) $('alert5mCount').textContent = alertCount;
+    if ($('safe5mCount')) $('safe5mCount').textContent = safeCount;
+
+    const maxRad = state.visible.length ? maxOf(state.visible, r=>r.radius).toFixed(1) : '—';
+    if ($('maxRadius')) $('maxRadius').textContent = maxRad !== '—' ? maxRad + ' m' : '—';
+
+    document.querySelectorAll('[data-pre]').forEach(b=>{const v=PRE[b.dataset.pre];b.classList.toggle('on',[w.r,w.c,w.h,w.p].every((x,i)=>x===v[i]))});
+    if ($('tNowLabel')) $('tNowLabel').textContent=$('tNow').value;
+    if ($('tSoonLabel')) $('tSoonLabel').textContent=$('tSoon').value;
+    if ($('pinCount')) $('pinCount').textContent=state.pins.size;
+    
+    {const s=$('summary'),p=$('priority').value,top=state.visible[0];
+     if (s) {
+       s.hidden=false;
+       s.innerHTML=p!=='all'?`Showing only <b>${p}</b> spots. <a href="#" id="showAll">Show all spots</a>`:!top?'No spots match your filters. Press “Reset filters” on the left.':`<b>${alertCount ? alertCount + ' detection(s) trigger a fire radius ≥ 5m alert.' : 'No spots exceed the 5-meter fire radius threshold.'}</b> Top spot: near ${escapeHtml(top.place)} (${top.radius.toFixed(1)}m radius). <a href="#" id="goTop">Show me the top spot →</a>`;
+       const sa=$('showAll');if(sa)sa.onclick=e=>{e.preventDefault();$('priority').value='all';$('radiusFilter').value='all';render()};
+       const gt=$('goTop');if(gt)gt.onclick=e=>{e.preventDefault();state.selected=top.id;render();}}
+    }
+    
+    if ($('mapCount')) $('mapCount').textContent=`${state.visible.length} visible detections`;
+    if ($('export')) $('export').disabled=!state.visible.length;
+    
+    drawLeafletMarkers();
+    drawSvgMap();
+    drawTable();
+    drawDetails();
+    drawAlerts();
+    if ($('timelineLabel')) $('timelineLabel').textContent=state.timelineTime===null?'Showing latest observations':'Timeline mode';
+    if ($('timelineTime')) $('timelineTime').textContent=state.timelineTime===null?'Latest':new Date(state.timelineTime).toISOString().slice(0,16).replace('T',' ')+' UTC';
+  }
+
+  function drawMapInsights(){
+    const el=$('mapInsights'); if(!el)return;
+    const rows=state.visible||[], high=rows.filter(r=>r.priority==='Check now').length;
+    const strongest=rows.filter(r=>!r.frpMissing).sort((a,b)=>b.frp-a.frp)[0];
+    const latest=rows.length?rows.reduce((a,b)=>a.t>b.t?a:b):null;
+    const selected=rows.find(r=>r.id===state.selected);
+    const top=rows.slice().sort((a,b)=>b.score-a.score)[0];
+    const tile=(label,value)=>`<div class="insight-tile"><span>${label}</span><strong>${value}</strong></div>`;
+    el.innerHTML=`<h3>📊 Quick map insights</h3><div class="insight-grid">${tile('Visible detections',String(rows.length))}${tile('High priority',String(high))}${tile('Strongest heat (FRP)',strongest?strongest.frp.toFixed(1)+' MW':'Not supplied')}${tile('Latest observation (UTC)',latest?escapeHtml(latest.iso):'—')}</div><p class="insight-note">${selected?`Selected: <b>${escapeHtml(selected.place)}</b> · Fire radius: <b>${selected.radius.toFixed(1)}m</b> (${selected.radiusAlert ? '🚨 Alert: ≥ 5m' : '🟢 No Alert: < 5m'}) · score ${selected.score.toFixed(1)} · ${selected.la.toFixed(4)}, ${selected.lo.toFixed(4)}.`:top?`Highest review score: <b>${escapeHtml(top.place)}</b> · ${top.score.toFixed(1)}/100. Select a dot or table row for its full breakdown.`:'Load demo data or upload a CSV to see a live summary.'} These are heat detections, not confirmed fires.</p>`;
+    const extra=$('thermalInsights'); if(extra){
+      const temps=rows.filter(r=>Number.isFinite(r.tempC));
+      const avgConf=rows.length?rows.reduce((sum,r)=>sum+r.confidence,0)/rows.length*100:NaN;
+      const low=rows.filter(r=>r.priority==='Keep watching').length, mid=rows.filter(r=>r.priority==='Check soon').length;
+      const pct=n=>rows.length?Math.round(n/rows.length*100):0;
+      const bar=(label,n,color)=>`<div class="priority-row"><span>${label}</span><div class="priority-track"><div class="priority-fill" style="width:${pct(n)}%;background:${color}"></div></div><b>${n}</b></div>`;
+      extra.innerHTML=`<h3>🌡️ Thermal &amp; data quality</h3><div class="extra-grid"><div class="extra-stat"><span>${temps.length?'Average supplied temperature':'Surface temperature'}</span><strong>${temps.length?(temps.reduce((a,r)=>a+r.tempC,0)/temps.length).toFixed(1)+' °C':'Not supplied'}</strong></div><div class="extra-stat"><span>Average confidence</span><strong>${Number.isFinite(avgConf)?avgConf.toFixed(0)+'%':'—'}</strong></div><div class="extra-stat"><span>FRP coverage</span><strong>${rows.length?rows.filter(r=>!r.frpMissing).length+' / '+rows.length:'—'}</strong></div><div class="extra-stat"><span>5m Radius Alerts</span><strong>${rows.filter(r=>r.radiusAlert).length}</strong></div></div><div class="priority-bars">${bar('Check now',high,'#d9534f')}${bar('Check soon',mid,'#e8912d')}${bar('Keep watching',low,'#e0b83a')}</div><p class="temp-note">Fire radius &ge; 5m triggers an alert. Confidence and priority are screening indicators, not proof of a fire.</p>`;
+    }
+  }
+
+  function drawTable(){
+    const body=$('tableBody');
+    if (!body) return;
+    if ($('more')) {
+      $('more').hidden=state.visible.length<=15;
+      $('more').textContent=state.all?'Show top 15 only':'Show all ('+Math.min(250,state.visible.length)+')';
+    }
+    if(!state.visible.length){body.innerHTML='<tr><td colspan="13" class="empty">No matching observations. Try raising the age window, lowering minimum confidence, or resetting filters.</td></tr>';return;}
+    body.innerHTML=state.visible.slice(0,state.all?250:15).map(r=>{
+      const alertPill = r.radiusAlert
+        ? '<span class="pill red">🚨 Alert (≥5m)</span>'
+        : '<span class="pill green">🟢 No alert (&lt;5m)</span>';
+      return `<tr data-id="${r.id}" class="${state.selected===r.id?'selected':''}" tabindex="0">
+        <td>${state.pins.has(r.id)?'★ ':''}${r.rank}</td>
+        <td>${alertPill}</td>
+        <td style="font-weight:700;color:${r.radiusAlert?'#c0392b':'#176b50'}">${r.radius.toFixed(1)} m</td>
+        <td><span class="pill ${priorityClass(r.priority)}">${r.priority}</span></td>
+        <td>${r.score.toFixed(0)}</td>
+        <td>${escapeHtml(r.iso)}</td>
+        <td title="${r.la.toFixed(5)}, ${r.lo.toFixed(5)}">${r.la.toFixed(4)}, ${r.lo.toFixed(4)}</td>
+        <td>${locThumb(r)}</td>
+        <td>${escapeHtml(r.place)}</td>
+        <td>${escapeHtml(r.confidenceLabel)}</td>
+        <td>${r.frpMissing?'—':r.frp.toFixed(1)}</td>
+        <td>${r.nearby}${r.growing?' ↑':''}</td>
+        <td>${r.persist>=1?r.persist.toFixed(0)+' h':r.persist>0?'&lt; 1 h':'one-off'}</td>
+      </tr>`;
+    }).join('');
+
+    body.querySelectorAll('tr[data-id]').forEach(tr=>{
+      const pick=()=>{
+        state.selected=Number(tr.dataset.id);
+        const sel = state.rows.find(x => x.id === state.selected);
+        if (sel && leafletMap) leafletMap.panTo([sel.la, sel.lo], { animate: true, duration: 0.5 });
+        render();
+      };
+      tr.addEventListener('click',pick);
+      tr.addEventListener('keydown',e=>{if(e.key==='Enter'){pick();}});
+    });
+  }
+
+  function locThumb(r){
+    if(!state.ext){const R=state.rows,a=minOf(R,q=>q.la),b=maxOf(R,q=>q.la),c=minOf(R,q=>q.lo),d=maxOf(R,q=>q.lo),pa=(b-a)*.08||.05,pc=(d-c)*.08||.05;
+      state.ext=[a-pa,b+pa,c-pc,d+pc];const[A,B,C,D]=state.ext,st=Math.ceil(R.length/150);
+      state.bg=R.filter((_,i)=>i%st===0).map(q=>`<circle cx="${((q.lo-C)/(D-C)*76).toFixed(1)}" cy="${((B-q.la)/(B-A)*46).toFixed(1)}" r="1" fill="#c9b8a5"/>`).join('');}
+    const[A,B,C,D]=state.ext,x=((r.lo-C)/(D-C)*76).toFixed(1),y=((B-r.la)/(B-A)*46).toFixed(1),col=r.radiusAlert?'#d9534f':'#176b50';
+    return `<svg class="loc" width="76" height="46" viewBox="0 0 76 46" role="img" aria-label="Location ${r.la.toFixed(2)}, ${r.lo.toFixed(2)}"><title>Latitude ${r.la.toFixed(4)}, Longitude ${r.lo.toFixed(4)}</title><rect width="76" height="46" fill="#efe6da"/><path d="M25 0V46M51 0V46M0 15V15M0 15H76M0 31H76" stroke="#e0d3c3" stroke-width=".6"/>${state.bg}<circle cx="${x}" cy="${y}" r="4" fill="${col}" stroke="#2a1f1a" stroke-width="1.2"/></svg>`;
+  }
+
+  const SENS=[[5,12,6],[3,8,4],[2,5,3]];
+  function computeAlerts(){
+    const [uh,ah,ae]=SENS[+$('sens').value],cells={};
+    state.visible.forEach(r=>{
+      const k=Math.floor(r.la/.5)+'_'+Math.floor(r.lo/.5);
+      const c=cells[k]||(cells[k]={key:k,urgent:0,active:0,radAlerts:0,frp:0,top:r});
+      c.active++;
+      if(r.priority==='Check now') c.urgent++;
+      if(r.radiusAlert) c.radAlerts++;
+      c.frp+=r.frp;
+      if(r.score>c.top.score) c.top=r;
+    });
+    return Object.values(cells).map(c=>({...c,level:(c.urgent>=uh||c.active>=ah||c.radAlerts>=2)?'high':(c.active>=ae||c.radAlerts>=1)?'elevated':null})).filter(c=>c.level).sort((a,b)=>(b.level==='high')-(a.level==='high')||b.radAlerts-a.radAlerts||b.urgent-a.urgent).slice(0,8);
+  }
+
+  function toast(a){
+    const t=document.createElement('div');t.className='toast';t.setAttribute('role','alert');
+    const alertTime=new Date().toLocaleString();
+    t.innerHTML=`<b>🚨 High fire / radius alert</b><div class="small">${escapeHtml(a.top.place)} · ${a.radAlerts} spots with fire radius ≥ 5m</div><div class="small">📍 ${a.top.la.toFixed(5)}, ${a.top.lo.toFixed(5)} · Alert created: ${escapeHtml(alertTime)}</div><div style="display:flex;gap:6px;margin-top:8px"><button data-v="${a.top.id}" style="padding:5px 10px">View</button><button class="secondary" data-x style="padding:5px 10px">Dismiss</button></div>`;
+    const box=$('toasts');while(box.children.length>=3)box.firstChild.remove();box.appendChild(t);setTimeout(()=>t.remove(),12000);
+    try{if($('notifyOn').checked&&'Notification' in window&&Notification.permission==='granted')new Notification('Fire radius alert',{body:a.top.place+' – radius ≥ 5m'});}catch(e){}
+  }
+
+  function drawAlerts(){
+    const list=computeAlerts(),hi=list.filter(a=>a.level==='high');
+    if ($('bellCount')) $('bellCount').textContent=hi.length;
+    if ($('bell')) $('bell').classList.toggle('alert',hi.length>0);
+    if ($('alertList')) {
+      $('alertList').innerHTML=list.length?list.map(a=>`<div class="al ${a.level==='high'?'':'el'}"><div><b>${a.level==='high'?'🔴 High fire activity':'🟠 Elevated activity'}</b> · ${escapeHtml(a.top.place)}<div class="small">${a.radAlerts} spots with fire radius ≥ 5m · ${a.active} active spots · ${a.frp.toFixed(0)} MW total</div><div class="small">📍 ${a.top.la.toFixed(5)}, ${a.top.lo.toFixed(5)} · ${escapeHtml(a.top.iso)}</div><div class="small">Alert evaluated: ${escapeHtml(new Date().toLocaleString())}</div></div><button class="secondary" data-al="${a.top.id}">Show</button></div>`).join(''):'<div class="small">✅ No high-activity or radius alerts with the current filters and sensitivity.</div>';
+    }
+    hi.forEach(a=>{if(state.notified.has(a.key))return;state.notified.add(a.key);toast(a);});
+  }
+
+  const prCol=p=>p.radiusAlert?'#d9534f':p.priority==='Check soon'?'#e8912d':'#e0b83a';
+  let radarR=10;
+  const WORLD=[[[-168,66],[-156,71],[-125,70],[-95,72],[-80,63],[-62,60],[-55,50],[-67,45],[-76,35],[-81,25],[-97,26],[-97,18],[-87,21],[-83,10],[-78,8],[-90,14],[-105,20],[-117,32],[-124,40],[-125,49],[-140,60]],[[-55,60],[-45,60],[-20,70],[-20,82],[-60,82],[-70,76]],[[-78,8],[-60,10],[-50,0],[-35,-6],[-40,-22],[-58,-38],[-66,-55],[-74,-50],[-72,-30],[-81,-5]],[[-10,36],[-9,43],[-2,48],[5,52],[10,58],[20,70],[40,68],[70,73],[110,77],[140,72],[180,68],[170,60],[140,52],[130,42],[122,38],[122,30],[110,20],[106,10],[104,1],[98,8],[94,17],[92,22],[88,22],[80,14],[77,8],[72,21],[67,25],[57,25],[52,16],[44,13],[39,21],[34,28],[28,36],[22,36],[12,38],[3,42]],[[-17,21],[-10,35],[10,37],[32,31],[43,12],[51,12],[40,-15],[35,-25],[20,-35],[12,-17],[9,4],[-8,4],[-17,14]],[[114,-22],[122,-18],[136,-12],[142,-11],[153,-26],[150,-38],[140,-38],[130,-32],[115,-34]]];
+  
+  function drawWorld(){
+    const s=$('world');
+    if (!s) return;
+    let o='<rect width="360" height="180" fill="#efe6da"/>';
+    WORLD.forEach(p=>o+=`<polygon points="${p.map(([lo,la])=>(lo+180)+','+(90-la)).join(' ')}" fill="#dccab3" stroke="#c4ad93" stroke-width=".4"/>`);
+    const list=state.visible;if($('worldCount'))$('worldCount').textContent=list.length?list.length+' spots':'';
+    if(list.length){
+      const x0=minOf(list,r=>r.lo)+180,x1=maxOf(list,r=>r.lo)+180,y0=90-maxOf(list,r=>r.la),y1=90-minOf(list,r=>r.la);
+      o+=`<rect x="${(x0-2).toFixed(1)}" y="${(y0-2).toFixed(1)}" width="${(x1-x0+4).toFixed(1)}" height="${(y1-y0+4).toFixed(1)}" fill="none" stroke="#9a3412" stroke-width="1"/>`;
+      list.slice().reverse().forEach(r=>{o+=`<circle cx="${(r.lo+180).toFixed(1)}" cy="${(90-r.la).toFixed(1)}" r="1.4" fill="${prCol(r)}"/>`;});
+      const sel=list.find(r=>r.id===state.selected);if(sel)o+=`<circle cx="${(sel.lo+180).toFixed(1)}" cy="${(90-sel.la).toFixed(1)}" r="4" fill="none" stroke="#431407" stroke-width="1.2"/>`;
+    }
+    s.innerHTML=o;
+  }
+
+  $('world').addEventListener('click', e => {
+    const rect = $('world').getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const clickLon = (clickX / rect.width) * 360 - 180;
+    const clickLat = 90 - (clickY / rect.height) * 180;
+    if (leafletMap) {
+      leafletMap.panTo([clickLat, clickLon], { animate: true, duration: 0.8 });
+    }
+  });
+
+  function drawRadar(){
+    const s=$('radar'),r=state.rows.find(x=>x.id===state.selected),R=radarR;
+    if (!s) return;
+    document.querySelectorAll('[data-rr]').forEach(b=>b.classList.toggle('on',+b.dataset.rr===R));
+    if(!r||!state.visible.some(x=>x.id===r.id)){s.innerHTML='<text x="100" y="104" text-anchor="middle" font-size="11" fill="#7a6a5f">Select a spot first</text>';if($('radarOut'))$('radarOut').textContent='';return;}
+    const rad=Math.PI/180,kx=111.32*Math.cos(r.la*rad),ky=110.57,sc=90/R;let o='',n=0,now=0,soon=0;
+    [1/3,2/3,1].forEach(f=>o+=`<circle cx="100" cy="100" r="${90*f}" fill="none" stroke="#e6d9cb"/>`);
+    o+='<line x1="10" x2="190" y1="100" y2="100" stroke="#e6d9cb"/><line x1="100" x2="100" y1="10" y2="190" stroke="#e6d9cb"/>';
+    o+=`<g><polygon points="100,100 100,10 135,18" fill="#9a3412" fill-opacity=".18"/><line x1="100" y1="100" x2="100" y2="10" style="stroke:#9a3412;stroke-width:1.5"/><animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="3s" repeatCount="indefinite"/></g>`;
+    for(const p of state.visible){if(p.id===r.id)continue;const dx=dLon(r.lo,p.lo)*kx,dy=(p.la-r.la)*ky;if(Math.hypot(dx,dy)>R)continue;n++;if(p.radiusAlert)now++;else if(p.priority==='Check soon')soon++;if(n<=400)o+=`<circle data-rid="${p.id}" cx="${(100+dx*sc).toFixed(1)}" cy="${(100-dy*sc).toFixed(1)}" r="3.5" fill="${prCol(p)}" stroke="#fff" stroke-width=".8" style="cursor:pointer"><title>${escapeHtml(p.priority)} · score ${p.score.toFixed(0)} · radius ${p.radius.toFixed(1)}m</title></circle>`;}
+    o+=`<circle cx="100" cy="100" r="5" fill="${prCol(r)}" stroke="#431407" stroke-width="1.5"/><text x="188" y="97" text-anchor="end" font-size="8" fill="#7a6a5f">${R} km</text>`;
+    s.innerHTML=o;if($('radarOut'))$('radarOut').textContent=n?`${n} other spot(s) within ${R} km of the selected spot: ${now} with fire radius ≥ 5m alert. Click a dot to jump to it.`:`No other spots within ${R} km. Try a larger radius.`;
+  }
+
+  function scan(){
+    if(!state.visible.length){if($('scanOut'))$('scanOut').textContent='Load data first.';return;}
+    const btn=$('scanBtn');if(btn)btn.disabled=true;if($('scanOut'))$('scanOut').textContent='Scanning…';
+    setTimeout(()=>{
+      if(btn)btn.disabled=false;
+      const pts=state.visible.filter(r=>r.radiusAlert||r.priority!=='Keep watching').slice(0,1500),R=+$('radius').value,par=pts.map((_,i)=>i),f=i=>par[i]===i?i:(par[i]=f(par[i]));
+      const d=(a,b)=>{const q=Math.PI/180,x=dLon(a.lo,b.lo)*q*Math.cos((a.la+b.la)/2*q),y=(b.la-a.la)*q;return 6371*Math.hypot(x,y);};
+      for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)if(Math.abs(pts[i].la-pts[j].la)*111<=R&&d(pts[i],pts[j])<=R)par[f(i)]=f(j);
+      const gr={};pts.forEach((p,i)=>(gr[f(i)]=gr[f(i)]||[]).push(p));
+      const cl=Object.values(gr).filter(g=>g.length>1).map(g=>{g.sort((a,b)=>b.score-a.score);return{n:g.length,now:g.filter(x=>x.radiusAlert).length,top:g[0]};}).sort((a,b)=>b.now-a.now||b.n-a.n||b.top.score-a.top.score).slice(0,6);
+      if($('scanOut'))$('scanOut').innerHTML=cl.length?`<b>Found ${cl.length} group${cl.length>1?'s':''} of spots within ${R} km of each other:</b><ol style="margin:6px 0 0;padding-left:20px">`+cl.map(c=>`<li>${c.now?'🔴':'🟠'} <b>${c.n} spots</b> near ${escapeHtml(c.top.place)} (${c.now} spots with radius ≥ 5m) · <a href="#" data-sid="${c.top.id}">show</a></li>`).join('')+'</ol>':'No groups found. Try a larger radius, or lower the “Check soon” score under Fine-tune.';
+    },1200);
+  }
+
+  function drawDetails(){
+    drawRadar();drawWorld();drawMapInsights();drawSat();drawBrief();
+    const box=$('details'),r=state.rows.find(x=>x.id===state.selected);
+    const meta=$('mapMeta');
+    if (!box) return;
+    if(!r){if(meta)meta.innerHTML='<div class="meta-empty">No detection selected yet. Select a dot or table row.</div>';box.innerHTML='<p class="empty">Select a point on the map or a row in the priority list.</p>';return;}
+    const visible=state.visible.some(x=>x.id===r.id);
+    if(meta)meta.innerHTML=`<div><span class="meta-label">📍 Coordinates (latitude, longitude)</span><strong>${r.la.toFixed(5)}, ${r.lo.toFixed(5)}</strong></div><div><span class="meta-label">🕒 Observation timestamp (UTC)</span><strong>${escapeHtml(r.iso)} UTC</strong></div>`;
+    if(!visible){box.innerHTML='<p>This observation is currently hidden by your filters. Change the filters to show it again.</p>';return;}
+    const w=weights(),sum=w.r+w.c+w.h+w.p||1;
+    const factors=[
+      ['Recency',r.factorRecency,w.r,`Recent observations receive a higher value. This one is ${Math.max(0,((state.timelineTime===null?state.endTime:state.timelineTime)-r.t)/3600000).toFixed(1)} hours before reference.`],
+      ['Satellite confidence',r.factorConfidence,w.c,`Confidence used: ${escapeHtml(r.confidenceLabel)}.`],
+      ['Heat strength (FRP)',r.factorHeat,w.h,r.frpMissing?'FRP was not supplied; treated as 0.':`Reported FRP: ${r.frp.toFixed(1)} MW.`],
+      ['Nearby detections',r.factorNearby,w.p,`${r.nearby} other detection(s) within 2 km and 48 hours.`]
+    ];
+
+    const radiusAlertHtml = `
+      <div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:${r.radiusAlert?'#fbe9e7':'#e3f7ee'};border-left:5px solid ${r.radiusAlert?'#c0392b':'#176b50'};border:1px solid ${r.radiusAlert?'#ffc9c9':'#a7f3d0'}">
+        <strong style="color:${r.radiusAlert?'#c0392b':'#176b50'};font-size:13.5px;display:flex;align-items:center;gap:6px;">
+          ${r.radiusAlert ? '🚨 5-METER FIRE RADIUS ALERT: ACTIVE' : '🟢 5-METER FIRE RADIUS: NO ALERT'}
+        </strong>
+        <div style="font-size:12.5px;margin-top:4px;">
+          Estimated fire radius: <b style="font-size:15px;color:${r.radiusAlert?'#c0392b':'#176b50'}">${r.radius.toFixed(1)} meters</b>.
+          ${r.radiusAlert ? `Exceeds the 5m safety threshold (+${(r.radius - 5).toFixed(1)}m)! Immediate perimeter verification advised.` : `Under the 5.0m threshold (${(5 - r.radius).toFixed(1)}m below limit). Monitored safe.`}
+        </div>
+      </div>
+    `;
+
+    box.innerHTML=`<div class="cardhead"><span class="pill ${priorityClass(r.priority)}">${r.priority}</span><span class="small">${visible?'Visible':'Filtered out'}</span></div>
+      <div class="score">${r.score.toFixed(1)}<span style="font-size:14px;font-weight:500;color:#7a6a5f"> / 100</span></div>
+      <div style="margin:6px 0"><b>📍 ${escapeHtml(r.placeLong)}</b></div>
+      ${radiusAlertHtml}
+      <button class="secondary" id="pinBtn" style="padding:6px 10px">${state.pins.has(r.id)?'★ Pinned – click to unpin':'☆ Pin this spot'}</button>
+      <div class="small" style="margin-top:6px">${escapeHtml(r.iso)}<br>${r.la.toFixed(5)}, ${r.lo.toFixed(5)} · ${escapeHtml(r.satellite||'Satellite not specified')}</div>
+      <p><a href="https://www.google.com/maps?q=${encodeURIComponent(r.la+','+r.lo)}" target="_blank" rel="noopener">Open coordinates in Google Maps ↗</a></p>
+      ${factors.map(([name,val,wt,desc])=>`<div class="factor"><div class="factorhead"><strong>${name}</strong><span>${(100*val*wt/sum).toFixed(1)} score points</span></div><div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,val*100))}%"></div></div><div class="small">${desc}</div></div>`).join('')}
+      <p class="help"><strong>5-meter rule:</strong> spots with fire radius &ge; 5m trigger an alert. If less than 5m, no alert is triggered.</p>`;
+  }
+
+  function showError(message){if($('fileMessage'))$('fileMessage').className='help';if($('error')){$('error').textContent=message;$('error').style.display='block';}if($('fileMessage'))$('fileMessage').textContent='Upload not completed. Existing data was kept.';}
+  function stopPlayback(){state.playing=false;if(state.raf!==null)cancelAnimationFrame(state.raf);state.raf=null;if($('play'))$('play').textContent='▶ Play';}
+  function play(){
+    if(state.rows.length<2)return;
+    if(state.playing){stopPlayback();return;}
+    state.playing=true;if($('play'))$('play').textContent='Ⅱ Pause';
+    const span0=state.endTime-state.startTime,p0=(state.timelineTime===null||span0<=0||state.timelineTime>=state.endTime)?0:Math.max(0,(state.timelineTime-state.startTime)/span0);
+    state.startStamp=performance.now();const duration=12000;
+    const frame=now=>{
+      if(!state.playing)return;
+      const p=Math.min(1,p0+(now-state.startStamp)/duration);
+      state.timelineTime=state.startTime+(state.endTime-state.startTime)*p;
+      if($('timeline'))$('timeline').value=Math.round(p*1000);render();
+      if(p>=1){stopPlayback();}else state.raf=requestAnimationFrame(frame);
+    };
+    state.raf=requestAnimationFrame(frame);
+  }
+
+  function downloadCSV(){
+    const rows=state.visible;if(!rows.length)return;
+    const cell=v=>{let s=String(v??'');if(typeof v!=='number'&&!/^-?\d+(\.\d+)?$/.test(s)&&/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+    const lines=[['rank','alert_status_5m','fire_radius_m','priority','score','time_utc','latitude','longitude','area','confidence','frp_mw','nearby_detections','satellite','synthetic_demo'].map(cell).join(',')];
+    rows.forEach(r=>lines.push([r.rank,r.radiusAlert?'ALERT_GE_5M':'NO_ALERT_LT_5M',r.radius.toFixed(1),r.priority,r.score.toFixed(1),r.iso,r.la,r.lo,r.place,r.confidenceLabel,r.frpMissing?'':r.frp,r.nearby,r.satellite,r.synthetic?'yes':'no'].map(cell).join(',')));
+    const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='fire-triage-visible-observations.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  }
+
+  function resetFilters(){
+    stopPlayback();state.timelineTime=null;
+    Object.entries(defaults).forEach(([id,v])=>{if($(id))$(id).value=v;});
+    if($('priority'))$('priority').value='all';
+    if($('radiusFilter'))$('radiusFilter').value='all';
+    if($('pinOnly'))$('pinOnly').checked=false;
+    if($('hideOneOff'))$('hideOneOff').checked=false;
+    if($('timeline'))$('timeline').value=1000;
+    render();
+  }
+
+  // --- API connection: NASA FIRMS (direct) or your own backend ---
+  const store={get(k,d){try{return localStorage.getItem(k)??d;}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+  let API_KEY=store.get('fire_triage_api_key','fire_sec_key_2026_dev');
+  const isFirmsKey=k=>/^[a-z0-9]{32}$/i.test(k);
+
+  function updateApiKeyUI(key,ok,msg){
+    if($('apiKeyInput'))$('apiKeyInput').value=key;
+    if($('activeKeyDisplay'))$('activeKeyDisplay').textContent=key.length>16?key.slice(0,14)+'...':key;
+    if($('headerKeySnippet'))$('headerKeySnippet').textContent=key.length>10?key.slice(0,8)+'...':key;
+    if($('headerKeyDot'))$('headerKeyDot').style.color=ok?'#176b50':'#c0392b';
+    if($('apiStatusBadge')){$('apiStatusBadge').textContent=ok?'● Connected':'● Not connected';$('apiStatusBadge').style.color=ok?'#176b50':'#c0392b';}
+    if(msg&&$('fileMessage')){$('fileMessage').textContent=msg;$('fileMessage').className=ok?'success':'help';}
+  }
+  function apiError(msg){if($('error')){$('error').textContent=msg;$('error').style.display='block';}}
+  function syncSourceUI(){
+    const v=$('apiSource').value;
+    $('firmsOpts').style.display=v==='backend'?'none':'';
+    $('backendOpts').style.display=v==='firms'?'none':'';
+  }
+  async function fetchT(url,opts,ms=20000){
+    const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms);
+    try{return await fetch(url,{...(opts||{}),signal:ctl.signal});}finally{clearTimeout(t);}
+  }
+  async function loadFirms(key){
+    const area=$('firmsArea').value,days=$('firmsDays').value;
+    const url='https://firms.modaps.eosdis.nasa.gov/api/area/csv/'+encodeURIComponent(key)+'/VIIRS_SNPP_NRT/'+area+'/'+days;
+    let res;
+    try{res=await fetchT(url);}catch(e){throw new Error('Could not reach NASA FIRMS. Check your internet connection, firewall or ad-blocker. ('+(e.name==='AbortError'?'timed out':e.message)+')');}
+    const text=(await res.text()).trim();
+    if(!res.ok||!/^latitude/i.test(text))throw new Error('NASA FIRMS rejected the request: '+(text.slice(0,160)||('HTTP '+res.status))+' — check that the MAP_KEY is correct.');
+    const lines=text.split(/\r?\n/),head=lines[0],body=lines.slice(1);
+    if(!body.length)throw new Error('Key accepted, but FIRMS has no detections for that area and time. Try more days or a larger area.');
+    const fi=head.split(',').indexOf('frp');
+    if(fi>=0)body.sort((x,y)=>(+y.split(',')[fi]||0)-(+x.split(',')[fi]||0));
+    const used=body.slice(0,3000);
+    parseData(head+'\n'+used.join('\n'));
+    return {n:used.length,badge:'🟢 NASA FIRMS live ('+used.length+' spots)',msg:'Loaded '+used.length+' live VIIRS detections from NASA FIRMS'+(body.length>used.length?' (hottest 3000 of '+body.length+')':'')+'. Fire radius is estimated from FRP because FIRMS does not supply it.'};
+  }
+  async function loadBackend(key){
+    const base=($('backendUrl').value.trim()||'http://localhost:3000').replace(/\/+$/,'');
+    let res;
+    try{res=await fetchT(base+'/api/detections',{headers:{'x-api-key':key}},10000);}
+    catch(e){throw new Error('Could not reach '+base+'. Make sure the server is running and sends the header Access-Control-Allow-Origin (CORS), or open this dashboard through that server (http://...) instead of file://. To use live NASA data without a server, choose "NASA FIRMS" and paste a MAP_KEY.');}
+    if(res.status===404){
+      const url2=base+'/api/fires?source=VIIRS_SNPP_NRT&bbox='+$('firmsArea').value+'&days='+$('firmsDays').value;
+      let r2;try{r2=await fetchT(url2,{headers:{'x-api-key':key}},30000);}catch(e){throw new Error('Could not reach '+url2+'.');}
+      const t2=(await r2.text()).trim();
+      if(!r2.ok||!/^latitude/i.test(t2))throw new Error('Backend /api/fires failed: '+(t2.slice(0,200)||('HTTP '+r2.status))+' (set NASA_FIRMS_MAP_KEY in the same terminal that runs node server.js, then restart it).');
+      const ln=t2.split(/\r?\n/),h2=ln[0],b2=ln.slice(1);
+      if(!b2.length)throw new Error('Server reached NASA, but there are no detections for that area and time.');
+      const f2=h2.split(',').indexOf('frp');
+      if(f2>=0)b2.sort((x,y)=>(+y.split(',')[f2]||0)-(+x.split(',')[f2]||0));
+      const u2=b2.slice(0,3000);parseData(h2+'\n'+u2.join('\n'));
+      return {n:u2.length,badge:'🟢 Backend + NASA ('+u2.length+' spots)',msg:'Loaded '+u2.length+' live detections through '+base+'/api/fires.'};
+    }
+    if(res.status===401||res.status===403)throw new Error('The backend rejected the API key (HTTP '+res.status+').');
+    if(!res.ok)throw new Error('Backend returned HTTP '+res.status+' for /api/detections.');
+    const json=await res.json();
+    const list=Array.isArray(json)?json:(json.detections||json.data);
+    if(!Array.isArray(list)||!list.length)throw new Error('Backend replied, but no detections array was found (expected {detections:[...]}).');
+    const lines=['latitude,longitude,acq_date,acq_time,confidence,frp,satellite,fire_radius_m'];
+    list.forEach(d=>lines.push([d.latitude,d.longitude,d.acq_date,d.acq_time,d.confidence,d.frp,d.satellite||'API',d.fire_radius_m].map(v=>v??'').join(',')));
+    parseData(lines.join('\n'));
+    return {n:list.length,badge:'🟢 Backend synced ('+list.length+' spots)',msg:'Loaded '+list.length+' detections from '+base+'.'};
+  }
+  async function connectWithApiKey(silent){
+    silent=silent===true;
+    const key=($('apiKeyInput')?$('apiKeyInput').value:API_KEY).replace(/[\s"']+/g,'');
+    if($('error'))$('error').style.display='none';
+    if(!key){apiError('Please enter an API key.');return;}
+    API_KEY=key;store.set('fire_triage_api_key',key);
+    ['apiSource','firmsArea','firmsDays','backendUrl'].forEach(id=>{if($(id))store.set('fire_triage_'+id,$(id).value);});
+    let src=$('apiSource').value;if(src==='auto')src=isFirmsKey(key)?'firms':'backend';
+    const btn=$('btnConnectApi');btn.disabled=true;
+    if($('apiStatusBadge')){$('apiStatusBadge').textContent='● Connecting…';$('apiStatusBadge').style.color='#8a5200';}
+    if($('dataBadge'))$('dataBadge').textContent='Connecting…';
+    try{
+      const r=src==='firms'?await loadFirms(key):await loadBackend(key);
+      updateApiKeyUI(key,true,r.msg);
+      if($('dataBadge'))$('dataBadge').textContent=r.badge;
+      store.set('fire_triage_autoconnect','1');
+      switchMapMode(state.mapMode);
+      if(!silent&&state.mapMode!=='plot')zoneToData();
+    }catch(e){
+      updateApiKeyUI(key,false,'Not connected. Your existing data was kept.');
+      apiError(e.message||String(e));
+      if($('dataBadge'))$('dataBadge').textContent=state.rows.length?'Demo data (API not connected)':'No data';
+    }finally{btn.disabled=false;}
+  }
+  if($('apiSource'))$('apiSource').addEventListener('change',syncSourceUI);
+
+  // --- Spot briefing: facts + nearby heat timeline for the selected spot ---
+  const briefText={c:'',v:''};
+  const distKm=(a,b)=>{const q=Math.PI/180;return 6371*Math.hypot(dLon(a.lo,b.lo)*q*Math.cos((a.la+b.la)/2*q),(b.la-a.la)*q);};
+  function drawBrief(){
+    const grid=$('briefGrid'),svg=$('briefChart'),note=$('briefNote');if(!grid)return;
+    const r=state.rows.find(x=>x.id===state.selected);
+    if(!r||!state.visible.some(x=>x.id===r.id)){grid.innerHTML='<div class="insight-tile" style="grid-column:1/-1"><span>No spot selected</span><strong>Select a dot or table row</strong></div>';svg.innerHTML='';note.textContent='';briefText.c='';briefText.v='';return;}
+    const near=state.rows.filter(p=>p.id!==r.id&&Math.abs(p.la-r.la)<.1&&distKm(r,p)<=5);near.push(r);near.sort((a,b)=>a.t-b.t);
+    const list=near.length>40?near.slice(-40):near;
+    const spanH=list.length>1?(list[list.length-1].t-list[0].t)/3600000:0;
+    let trend='Too few repeats to judge';
+    if(list.length>=3){const k=Math.max(1,Math.floor(list.length/3)),avg=a=>a.reduce((t,x)=>t+x.frp,0)/a.length,f=avg(list.slice(0,k)),l=avg(list.slice(-k));trend=l>f*1.25+.5?'Heat rising ↑':l<f*.75-.5?'Heat falling ↓':'Heat steady →';}
+    const d=new Date(r.t),hr=(((d.getUTCHours()+d.getUTCMinutes()/60+r.lo/15)%24)+24)%24;
+    const clock=String(Math.floor(hr)).padStart(2,'0')+':'+String(Math.floor(hr%1*60)).padStart(2,'0')+(hr>=6&&hr<18?' (day)':' (night)');
+    const age=Math.max(0,(state.endTime-r.t)/3600000);
+    const verdict=r.radiusAlert&&near.length>2?'Verify first: radius 5 m or more and seen repeatedly':r.radiusAlert?'Verify soon: radius is 5 m or more':'Low urgency: radius under 5 m';
+    const tile=(l,v,wide)=>'<div class="insight-tile"'+(wide?' style="grid-column:1/-1"':'')+'><span>'+l+'</span><strong>'+v+'</strong></div>';
+    grid.innerHTML=tile('Suggested action',escapeHtml(verdict),true)+tile('Trend within 5 km',trend)+tile('Detections within 5 km',String(near.length))+tile('Local solar time',clock)+tile('Age',age<1?'under 1 h':age.toFixed(0)+' h before newest');
+    const W=260,maxF=Math.max(1,...list.map(x=>x.frp)),step=(W-20)/list.length,bw=Math.max(2,Math.min(14,step-2));
+    let o='<line x1="10" x2="250" y1="76" y2="76" stroke="#e6d9cb"/>';
+    list.forEach((x,i)=>{const h=Math.max(2,x.frp/maxF*58),px=10+i*step,sel=x.id===r.id;o+='<rect x="'+px.toFixed(1)+'" y="'+(76-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="1.5" fill="'+(x.radiusAlert?'#d9534f':'#176b50')+'" fill-opacity="'+(sel?1:.6)+'"'+(sel?' stroke="#2a1f1a" stroke-width="1.5"':'')+'><title>'+escapeHtml(x.iso)+' · '+x.frp.toFixed(1)+' MW · radius '+x.radius.toFixed(1)+' m</title></rect>';});
+    o+='<text x="10" y="90" font-size="8" fill="#7a6a5f">'+escapeHtml(list[0].iso.slice(5,16))+'</text><text x="250" y="90" font-size="8" text-anchor="end" fill="#7a6a5f">'+escapeHtml(list[list.length-1].iso.slice(5,16))+'</text><text x="10" y="10" font-size="8" fill="#7a6a5f">max '+maxF.toFixed(1)+' MW</text>';
+    svg.innerHTML=o;
+    note.textContent='Each bar is a detection within 5 km (tall = hotter, red = radius 5 m or more) over '+(spanH<1?'under 1':spanH.toFixed(0))+' h. The outlined bar is the selected spot.';
+    briefText.c=r.la.toFixed(5)+', '+r.lo.toFixed(5);
+    briefText.v=['Fire triage briefing','Location: '+r.la.toFixed(5)+', '+r.lo.toFixed(5)+' ('+r.placeLong+')','Observed: '+r.iso,'Fire radius: '+r.radius.toFixed(1)+' m ('+(r.radiusAlert?'ALERT, 5 m or more':'no alert, under 5 m')+')','Heat power: '+(r.frpMissing?'not supplied':r.frp.toFixed(1)+' MW'),'Priority: '+r.priority+' (score '+r.score.toFixed(0)+'/100)','Nearby detections within 5 km: '+near.length+' - '+trend,'Suggested action: '+verdict,'This is a heat detection, not a confirmed fire.'].join('\n');
+  }
+  async function copyText(btn,text){
+    if(!text)return;
+    try{await navigator.clipboard.writeText(text);}
+    catch(e){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(_){}t.remove();}
+    const o=btn.dataset.o||btn.textContent;btn.dataset.o=o;btn.textContent='Copied ✓';setTimeout(()=>{btn.textContent=o;},1500);
+  }
+  if($('copyCoords'))$('copyCoords').onclick=e=>copyText(e.currentTarget,briefText.c);
+  if($('copyBrief'))$('copyBrief').onclick=e=>copyText(e.currentTarget,briefText.v);
+
+  // Batch rapid slider/filter changes into one redraw per frame
+  let rq=0;
+  const scheduleRender=()=>{if(rq)return;rq=requestAnimationFrame(()=>{rq=0;render();});};
+
+  // --- After connecting: zoom the main map to the area the data covers ---
+  function zoneToData(){
+    if(!leafletMap||!state.rows.length)return;
+    leafletMap.invalidateSize();
+    const la=state.rows.map(r=>r.la),lo=state.rows.map(r=>r.lo);
+    leafletMap.flyToBounds([[Math.min(...la),Math.min(...lo)],[Math.max(...la),Math.max(...lo)]],{padding:[30,30],duration:1.2,maxZoom:12});
+    if($('leafletMap'))$('leafletMap').scrollIntoView({behavior:'smooth',block:'center'});
+  }
+
+  // --- Satellite image of the selected spot ---
+  const sat={src:'esri',span:10,key:'',tried:false};
+  function drawSat(){
+    const img=$('satImg');if(!img)return;
+    const r=state.rows.find(x=>x.id===state.selected),msg=$('satMsg'),cap=$('satCap'),links=$('satLinks');
+    document.querySelectorAll('[data-satsrc]').forEach(b=>b.classList.toggle('on',b.dataset.satsrc===sat.src));
+    document.querySelectorAll('[data-satspan]').forEach(b=>b.classList.toggle('on',+b.dataset.satspan===sat.span));
+    if(!r){sat.key='';msg.hidden=false;msg.textContent='Select a spot to load its satellite image.';return;}
+    const key=sat.src+'|'+sat.span+'|'+r.id;if(key===sat.key)return;sat.key=key;
+    const W=520,H=340,km=sat.src==='nasa'?Math.max(sat.span,30):sat.span,date=r.iso.slice(0,10);
+    const hh=km/2*H/W/110.57,hw=km/2/(111.32*Math.max(.05,Math.cos(r.la*Math.PI/180)));
+    const w=Math.max(-180,r.lo-hw),e=Math.min(180,r.lo+hw),so=Math.max(-85,r.la-hh),n=Math.min(85,r.la+hh);
+    let url;
+    if(sat.src==='nasa'){
+      url='https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor,VIIRS_SNPP_Thermal_Anomalies_375m_All&STYLES=&SRS=EPSG:4326&BBOX='+[w,so,e,n].map(v=>v.toFixed(5)).join(',')+'&WIDTH='+W+'&HEIGHT='+H+'&FORMAT=image/jpeg&TIME='+date;
+      cap.textContent='NASA VIIRS true-colour for '+date+' (UTC) with thermal detections overlaid, about '+km+' km wide. Resolution is roughly 375 m per pixel and clouds can hide the ground.';
+    }else{
+      url='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox='+[w,so,e,n].map(v=>v.toFixed(6)).join(',')+'&bboxSR=4326&imageSR=3857&size='+W+','+H+'&format=jpg&f=image';
+      cap.textContent='Esri World Imagery, about '+km+' km wide, centred on '+r.la.toFixed(4)+', '+r.lo.toFixed(4)+'. This is archive imagery, so it may be older than the detection.';
+    }
+    links.innerHTML='<a href="https://www.google.com/maps/@'+r.la+','+r.lo+',16z/data=!3m1!1e3" target="_blank" rel="noopener">Google satellite ↗</a> · <a href="https://worldview.earthdata.nasa.gov/?v='+(r.lo-1).toFixed(3)+','+(r.la-.7).toFixed(3)+','+(r.lo+1).toFixed(3)+','+(r.la+.7).toFixed(3)+'&l=VIIRS_SNPP_CorrectedReflectance_TrueColor,VIIRS_SNPP_Thermal_Anomalies_375m_All&t='+date+'" target="_blank" rel="noopener">NASA Worldview ↗</a>';
+    $('satFallback').style.display='none';img.style.display='';const cr0=document.querySelector('.satcross');if(cr0)cr0.style.display='';
+    msg.hidden=false;msg.textContent='Loading satellite image…';
+    img.onload=()=>{msg.hidden=true;sat.tried=false;img.classList.add('loaded');};
+    img.onerror=()=>{if(!sat.tried){sat.tried=true;sat.src=sat.src==='esri'?'nasa':'esri';sat.key='';drawSat();return;}sat.tried=false;showSatFallback(r);};
+    img.classList.remove('loaded');
+    img.src=url;
+  }
+  // When no imagery can be loaded, draw a local map of the detections instead
+  function showSatFallback(r){
+    const img=$('satImg'),fb=$('satFallback'),msg=$('satMsg'),cross=document.querySelector('.satcross');
+    const W=520,H=340,km=Math.max(sat.span,5),sc=W/km,kx=111.32*Math.max(.05,Math.cos(r.la*Math.PI/180)),ky=110.57;
+    const X=lo=>W/2+dLon(r.lo,lo)*kx*sc,Y=la=>H/2-(la-r.la)*ky*sc;
+    const nice=[.5,1,2,5,10,20,50].filter(v=>v<=km/3).pop()||.5,col=q=>q.radiusAlert?'#e0645f':'#3fbf8f';
+    let o='<rect width="520" height="340" fill="#2b2a26"/>';
+    for(let k=-Math.ceil(km/2/nice);k<=Math.ceil(km/2/nice);k++){const x=(W/2+k*nice*sc).toFixed(1),y=(H/2+k*nice*sc).toFixed(1);o+='<line x1="'+x+'" x2="'+x+'" y1="0" y2="'+H+'" stroke="#46433b"/><line x1="0" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="#46433b"/>';}
+    [1,2].forEach(m=>{o+='<circle cx="'+W/2+'" cy="'+H/2+'" r="'+(nice*m*sc).toFixed(1)+'" fill="none" stroke="#7a7466" stroke-dasharray="4 4"/><text x="'+(W/2+nice*m*sc*.71+3).toFixed(1)+'" y="'+(H/2-nice*m*sc*.71-3).toFixed(1)+'" font-size="10" fill="#a39b8a">'+nice*m+' km</text>';});
+    state.visible.forEach(q=>{if(q.id===r.id)return;const x=X(q.lo),y=Y(q.la);if(x<-6||x>W+6||y<-6||y>H+6)return;o+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="4.5" fill="'+col(q)+'" fill-opacity=".85" stroke="#fff" stroke-width="1"><title>Radius '+q.radius.toFixed(1)+' m · '+escapeHtml(q.iso)+'</title></circle>';});
+    let near=null,nd=1e9;for(const c of CITIES){const d=Math.hypot(dLon(r.lo,c.lo)*kx,(c.la-r.la)*ky);if(d<nd){nd=d;near=c;}}
+    if(near){const cx=X(near.lo),cy=Y(near.la);
+      if(cx>8&&cx<W-8&&cy>8&&cy<H-8)o+='<line x1="'+W/2+'" y1="'+H/2+'" x2="'+cx.toFixed(1)+'" y2="'+cy.toFixed(1)+'" stroke="#a39b8a" stroke-dasharray="3 3"/><rect x="'+(cx-4).toFixed(1)+'" y="'+(cy-4).toFixed(1)+'" width="8" height="8" fill="#f0b66b"/><text x="'+(cx+8).toFixed(1)+'" y="'+(cy+4).toFixed(1)+'" font-size="11" fill="#f0b66b">'+escapeHtml(near.n)+'</text>';
+      else o+='<text x="12" y="300" font-size="11" fill="#f0b66b">Nearest city: '+escapeHtml(near.n)+', about '+Math.round(nd)+' km away</text>';}
+    const c=col(r);
+    o+='<circle cx="'+W/2+'" cy="'+H/2+'" r="10" fill="none" stroke="'+c+'" stroke-width="2"><animate attributeName="r" from="8" to="26" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" from="1" to="0" dur="1.8s" repeatCount="indefinite"/></circle><circle cx="'+W/2+'" cy="'+H/2+'" r="8" fill="'+c+'" stroke="#fff" stroke-width="2.5"/>';
+    o+='<line x1="16" x2="'+(16+nice*sc).toFixed(1)+'" y1="322" y2="322" stroke="#d8cfbf" stroke-width="2"/><text x="16" y="314" font-size="10" fill="#d8cfbf">'+nice+' km</text>';
+    o+='<text x="12" y="20" font-size="12" fill="#d8cfbf">Local detection map · satellite imagery unavailable</text>';
+    fb.innerHTML=o;fb.style.display='block';img.style.display='none';if(cross)cross.style.display='none';msg.hidden=true;
+    $('satCap').textContent='Satellite imagery could not be loaded (no internet, or the imagery service is blocked). Showing a local map of nearby detections instead. Red = radius 5 m or more, green = under 5 m. Press Retry to try again.';
+  }
+  if($('satRetry'))$('satRetry').onclick=()=>{sat.key='';sat.tried=false;drawSat();};
+  document.querySelectorAll('[data-satsrc]').forEach(b=>b.onclick=()=>{sat.src=b.dataset.satsrc;drawSat();});
+  document.querySelectorAll('[data-satspan]').forEach(b=>b.onclick=()=>{sat.span=+b.dataset.satspan;drawSat();});
+
+  if ($('btnToggleApiKeyEye')) $('btnToggleApiKeyEye').onclick = () => {
+    const inp = $('apiKeyInput');
+    if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+  };
+
+  if ($('btnConnectApi')) $('btnConnectApi').onclick = connectWithApiKey;
+  if ($('apiKeyHeaderBadge')) $('apiKeyHeaderBadge').onclick = () => {
+    if ($('apiKeyInput')) {
+      $('apiKeyInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $('apiKeyInput').focus();
+    }
+  };
+
+  if($('loadSample')) $('loadSample').addEventListener('click',()=>{stopPlayback();try{parseData(makeDemoCSV());if($('fileMessage'))$('fileMessage').textContent='Synthetic demo loaded with 5m radius logic.';}catch(e){showError(e.message);}});
+  if($('csvFile')) $('csvFile').addEventListener('change',async e=>{
+    const file=e.target.files?.[0];if(!file)return;
+    try{stopPlayback();const text=await file.text();parseData(text);}catch(err){showError(err.message||'Could not read this CSV.');}
+    e.target.value='';
+  });
+
+  ['hours','confidence','wRecency','wConfidence','wHeat','wRepeats','priority','radiusFilter','tNow','tSoon','country','pinOnly','hideOneOff','minSeen'].forEach(id=>{if($(id))$(id).addEventListener('input',scheduleRender);});
+  if($('reset')) $('reset').addEventListener('click',resetFilters);
+  if($('wDemo')) $('wDemo').onclick=()=>$('loadSample').click();
+  if($('wUpload')) $('wUpload').onclick=()=>$('csvFile').click();
+  if($('more')) $('more').onclick=()=>{state.all=!state.all;drawTable()};
+  if($('details')) $('details').addEventListener('click',e=>{if(e.target.id!=='pinBtn')return;const id=state.selected;if(state.pins.has(id))state.pins.delete(id);else state.pins.add(id);render();});
+  if($('radius')) $('radius').addEventListener('input',()=>{$('radLabel').textContent=$('radius').value+' km';});
+  if($('scanBtn')) $('scanBtn').onclick=scan;
+  if($('scanOut')) $('scanOut').addEventListener('click',e=>{const a=e.target.closest('a[data-sid]');if(!a)return;e.preventDefault();state.selected=+a.dataset.sid;render();if(leafletMap){const s=state.rows.find(x=>x.id===state.selected);if(s)leafletMap.panTo([s.la,s.lo]);}});
+  document.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{const v=PRE[b.dataset.pre];['wRecency','wConfidence','wHeat','wRepeats'].forEach((id,i)=>{if($(id))$(id).value=v[i];});render()});
+  
+  if($('filterNow')) $('filterNow').addEventListener('click',()=>{$('priority').value='Check now';render();});
+  if($('filterSoon')) $('filterSoon').addEventListener('click',()=>{$('priority').value='Check soon';render();});
+  if($('filterWatch')) $('filterWatch').addEventListener('click',()=>{$('priority').value='Keep watching';render();});
+  if($('filterAlert5m')) $('filterAlert5m').addEventListener('click',()=>{$('radiusFilter').value='alert';render();});
+  if($('filterSafe5m')) $('filterSafe5m').addEventListener('click',()=>{$('radiusFilter').value='safe';render();});
+
+  if($('mapModePlot')) $('mapModePlot').onclick=()=>switchMapMode('plot');
+  if($('mapModeCoord')) $('mapModeCoord').onclick=()=>switchMapMode('coord');
+  if($('mapModeGrid')) $('mapModeGrid').onclick=()=>switchMapMode('grid');
+  if($('mapModeThermal')) $('mapModeThermal').onclick=()=>switchMapMode('thermal');
+  if($('mapModeSat')) $('mapModeSat').onclick=()=>switchMapMode('sat');
+  if($('mapModeWorld')) $('mapModeWorld').onclick=()=>switchMapMode('world');
+
+  if($('export')) $('export').addEventListener('click',downloadCSV);
+  if($('play')) $('play').addEventListener('click',play);
+  if($('timelineOff')) $('timelineOff').addEventListener('click',()=>{stopPlayback();state.timelineTime=null;if($('timeline'))$('timeline').value=1000;render();});
+  if($('timeline')) $('timeline').addEventListener('input',()=>{
+    stopPlayback();
+    const p=+$('timeline').value/1000;
+    state.timelineTime=state.startTime+(state.endTime-state.startTime)*p;
+    scheduleRender();
+  });
+  if($('radar')) $('radar').addEventListener('click',e=>{const c=e.target.closest('circle[data-rid]');if(!c)return;state.selected=+c.dataset.rid;render();});
+  document.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{radarR=+b.dataset.rr;drawRadar();});
+  if($('hintsOn')) $('hintsOn').addEventListener('change',()=>document.body.classList.toggle('nohints',!$('hintsOn').checked));
+  const goMap=id=>{
+    state.selected=+id;
+    render();
+    const s=state.rows.find(x=>x.id===state.selected);
+    if(s&&leafletMap) leafletMap.panTo([s.la,s.lo],{animate:true,duration:0.6});
+    if($('leafletMap')) $('leafletMap').scrollIntoView({behavior:'smooth',block:'center'});
+  };
+  if($('alertList')) $('alertList').addEventListener('click',e=>{const b=e.target.closest('button[data-al]');if(b)goMap(b.dataset.al);});
+  if($('toasts')) $('toasts').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v!==undefined)goMap(b.dataset.v);b.closest('.toast').remove();});
+  if($('bell')) $('bell').onclick=()=>{if($('alertCard'))$('alertCard').scrollIntoView({behavior:'smooth',block:'center'});};
+  if($('sens')) $('sens').addEventListener('input',()=>{state.notified.clear();render();});
+  if($('notifyOn')) $('notifyOn').addEventListener('change',async()=>{const m=$('alertMsg');if(m)m.textContent='';if(!$('notifyOn').checked)return;try{if(!('Notification' in window))throw 0;if(Notification.permission==='default')await Notification.requestPermission();if(Notification.permission!=='granted')throw 0;if(m)m.textContent='Browser notifications are on.';}catch(e){$('notifyOn').checked=false;if(m)m.textContent='Your browser blocked notifications here. In-page alerts still work.';}});
+
+  // Tooltips
+  [['#loadSample','Loads practice data with 5m radius rule so you can try everything safely.'],['#csvFile','Upload a CSV with latitude, longitude, acq_date, acq_time.'],
+   ['label[for=hours]','Show only detections within this many hours of the newest observation in your file.'],['label[for=confidence]','Satellite confidence. Higher means the satellite is more sure it is real heat.'],
+   ['label[for=priority]','Show only one priority level. You can also click the colored tiles.'],['label[for=country]','Filter by the nearest country.'],
+   ['#pinOnly','Pin spots you care about from the details panel, then show just those.'],
+   ['#hideOneOff','Satellites pass only a few times a day, so a campfire usually appears once and never again.'],
+   ['label[for=wRecency]','How much newer detections count in the score.'],['label[for=wConfidence]','How much satellite confidence counts in the score.'],['label[for=wHeat]','FRP = fire radiative power (MW). Bigger means hotter or larger.'],
+   ['label[for=wRepeats]','Repeated detections close together raise the score.'],['label[for=tNow]','Scores at or above this are shown as Check now.'],['label[for=tSoon]','Scores at or above this (and below Check now) are Check soon.'],
+   ['h2:Detection map','Switch between Lat/Lon coordinates map, Grid map, Thermal map, Satellite map & World map.'],['h2:Why this observation','Shows 5m radius rule and how factors add to score.'],
+   ['h2:World overview','Where your spots are on a world map. Click anywhere to jump there.'],['h2:Mini scanner','A radar around the selected spot. Shows other spots within 5, 10 or 25 km.'],
+   ['h2:Cluster scanner','Finds groups of spots close together, which often means a real fire.'],['h2:Time-lapse','Replays the observations over time so you can see whether a fire grows or spreads.'],
+   ['h2:Priority list','Spots sorted by score. Includes fire radius and 5m alert status.']
+  ].forEach(([sel,t])=>{const els=sel.startsWith('h2:')?[...document.querySelectorAll('h2')].filter(h=>h.textContent.includes(sel.slice(3))):[document.querySelector(sel)];
+    els.forEach(el=>{if(!el)return;const host=el.closest('label')||el,tip=document.createElement('span');tip.className='tip';tip.tabIndex=0;tip.textContent='?';tip.dataset.tip=t;if(el.tagName==='BUTTON'||el.type==='file')el.insertAdjacentElement('afterend',tip);else host.appendChild(tip);});});
+
+  // Automatically load data and initialize map immediately on launch
+  function bootDashboard() {
+    ['apiSource','firmsArea','firmsDays','backendUrl'].forEach(id=>{const v=store.get('fire_triage_'+id,null);if(v!==null&&$(id))$(id).value=v;});
+    syncSourceUI();
+    try { parseData(makeDemoCSV()); switchMapMode(store.get('fire_triage_mapmode','coord')); } catch (e) { showError(e.message); }
+    updateApiKeyUI(API_KEY, false, 'Showing demo data. Choose a source, enter your key and press Connect API.');
+    if (store.get('fire_triage_autoconnect','') === '1' && API_KEY && API_KEY !== 'fire_sec_key_2026_dev') connectWithApiKey(true);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootDashboard);
+  } else {
+    bootDashboard();
+  }
+
+  window.addEventListener('load', () => {
+    if (typeof L !== 'undefined' && !leafletMap && state.rows.length) {
+      initLeafletMap();
+      if (leafletMap) {
+        const lats = state.rows.map(r => r.la);
+        const lons = state.rows.map(r => r.lo);
+        leafletMap.fitBounds([[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]], { padding: [35, 35] });
+      }
+      render();
+    }
+  });
+})();
+</script>
+</body>
+</html>
